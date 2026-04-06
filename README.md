@@ -1,93 +1,99 @@
-# amsc-client-tutorial
+# AmSC Client Tutorials
 
+Tutorial notebooks for the [AmSC Python Client](https://gitlab.com/amsc2/infrastructure-and-services/amsc-interfaces/amsc-python-client) — a unified SDK for the American Science Cloud APIs.
 
+## Getting Started
 
-## Getting started
+### 1. Clone this repository
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
-
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
-
-## Add your files
-
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
-
-```
-cd existing_repo
-git remote add origin https://gitlab.com/amsc2/infrastructure-and-services/amsc-interfaces/amsc-client-tutorial.git
-git branch -M main
-git push -uf origin main
+```bash
+git clone https://gitlab.com/amsc2/amsc-client-tutorial.git
+cd amsc-client-tutorial
 ```
 
-## Integrate with your tools
+### 2. Create a virtual environment
 
-* [Set up project integrations](https://gitlab.com/amsc2/infrastructure-and-services/amsc-interfaces/amsc-client-tutorial/-/settings/integrations)
+```bash
+python -m venv venv
+source venv/bin/activate    # Linux/macOS
+# venv\Scripts\activate     # Windows
+```
 
-## Collaborate with your team
+### 3. Install dependencies
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+```bash
+pip install -r requirements.txt
+```
 
-## Test and Deploy
+This installs the AmSC client, Globus SDK, and Jupyter from the public AmSC package registries.
 
-Use the built-in continuous integration in GitLab.
+### 4. Launch Jupyter
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+```bash
+jupyter notebook notebooks/
+```
 
-***
+## Tutorials
 
-# Editing this README
+| Notebook | Description | Auth Required |
+|----------|-------------|---------------|
+| [**Catalog Explorer**](notebooks/catalog_explorer.ipynb) | Browse the AmSC data catalog — search, filter, and inspect scientific works and artifacts on staging | Globus (AmSC) |
+| [**Catalog Tutorial**](notebooks/catalog_tutorial.ipynb) | Full CRUD operations — create, update, search, and delete catalog entities | Globus (AmSC) + write access |
+| [**Facility Tutorial**](notebooks/facility_tutorial.ipynb) | Connect to ALCF, list resources, submit a job to Polaris, monitor status, and read output via the filesystem API | Globus (ALCF) |
+| [**Filesystem Tutorial**](notebooks/filesystem_tutorial.ipynb) | Filesystem operations on ALCF resources — ls, head, tail, stat, cp, mv, mkdir, and more | Globus (ALCF) |
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+### Recommended order
 
-## Suggestions for a good README
+1. **Catalog Explorer** — read-only, works for everyone with a Globus account
+2. **Facility Tutorial** — requires an ALCF account and allocation
+3. **Filesystem Tutorial** — requires an ALCF account
+4. **Catalog Tutorial** — requires write access to a data catalog
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+## Prerequisites
 
-## Name
-Choose a self-explaining name for your project.
+### For all tutorials
+- Python 3.10+
+- A [Globus](https://www.globus.org/) account
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+### For ALCF tutorials (facility + filesystem)
+- An [ALCF account](https://accounts.alcf.anl.gov/)
+- An active ALCF project allocation (e.g., `datascience`)
+- Access to Polaris (or another ALCF compute resource)
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+## Troubleshooting
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+### Persistent 401 errors after re-authentication (ALCF)
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+ALCF tokens embed a Keycloak identity token inside the Globus access token. This embedded token can expire even while the Globus token itself remains valid. If you see repeated `AuthenticationError: Authentication failed (401)` errors even after re-authenticating:
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+1. **Clear your browser cookies** for `globus.org` and `globusid.org` domains
+2. **Delete cached credentials**: `rm ~/.amsc/credentials.json`
+3. **Restart your notebook kernel** and re-run from the beginning
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+This forces a full fresh login through ALCF's Keycloak identity provider.
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+### `globus-sdk` not found
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+If you get an import error for `globus_sdk`, make sure you installed from the requirements file:
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+```bash
+pip install -r requirements.txt
+```
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+### Package not found
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+If `amsc-client` can't be found, the GitLab package registry URLs may not be resolving. Try installing manually:
 
-## License
-For open source projects, say how it is licensed.
+```bash
+pip install \
+  --extra-index-url https://gitlab.com/api/v4/projects/77567162/packages/pypi/simple \
+  --extra-index-url https://gitlab.com/api/v4/projects/76368190/packages/pypi/simple \
+  --extra-index-url https://gitlab.com/api/v4/projects/80654726/packages/pypi/simple \
+  amsc-client
+```
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+## Links
+
+- [AmSC Python Client](https://gitlab.com/amsc2/infrastructure-and-services/amsc-interfaces/amsc-python-client) — source code and API docs
+- [AmSC Portal](https://my.american-science-cloud.org) — web interface
+- [Globus](https://www.globus.org/) — authentication and data transfer
