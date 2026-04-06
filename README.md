@@ -39,15 +39,100 @@ jupyter notebook notebooks/
 |----------|-------------|---------------|
 | [**Catalog Explorer**](notebooks/catalog_explorer.ipynb) | Browse the AmSC data catalog — search, filter, and inspect scientific works and artifacts on staging | Globus (AmSC) |
 | [**Catalog Tutorial**](notebooks/catalog_tutorial.ipynb) | Full CRUD operations — create, update, search, and delete catalog entities | Globus (AmSC) + write access |
-| [**Facility Tutorial**](notebooks/facility_tutorial.ipynb) | Connect to ALCF, list resources, submit a job to Polaris, monitor status, and read output via the filesystem API | Globus (ALCF) |
-| [**Filesystem Tutorial**](notebooks/filesystem_tutorial.ipynb) | Filesystem operations on ALCF resources — ls, head, tail, stat, cp, mv, mkdir, and more | Globus (ALCF) |
+| [**Facility Tutorial**](notebooks/facility_tutorial.ipynb) | Connect to a DOE facility, list resources, submit a job, monitor status, and read output via the filesystem API | Globus (facility) |
+| [**Filesystem Tutorial**](notebooks/filesystem_tutorial.ipynb) | Filesystem operations on facility resources — ls, head, tail, stat, cp, mv, mkdir, and more | Globus (facility) |
 
 ### Recommended order
 
 1. **Catalog Explorer** — read-only, works for everyone with a Globus account
-2. **Facility Tutorial** — requires an ALCF account and allocation
-3. **Filesystem Tutorial** — requires an ALCF account
+2. **Facility Tutorial** — requires an account and allocation at a DOE facility
+3. **Filesystem Tutorial** — requires an account at a DOE facility
 4. **Catalog Tutorial** — requires write access to a data catalog
+
+## Supported Facilities
+
+The AmSC Python Client uses the [DOE IRI Facility API](https://www.exascaleproject.org/research-group/iri/) standard, which provides a uniform interface across DOE computing facilities. The tutorial notebooks demonstrate ALCF (Polaris) but the same API works at any IRI-compliant facility.
+
+### ALCF (Argonne Leadership Computing Facility)
+
+ALCF is built into the client — no extra configuration needed:
+
+```python
+alcf = client.facility("alcf")
+polaris = alcf.resource("Polaris")
+
+job = polaris.submit(
+    executable="/bin/echo",
+    arguments=["Hello from Polaris!"],
+    nodes=1,
+    queue="debug",
+    account="myproject",
+    duration=300,
+    filesystems="home",         # ALCF-specific: PBS filesystem mounts
+)
+```
+
+| Detail | Value |
+|--------|-------|
+| API endpoint | `https://api.alcf.anl.gov/api/v1/` |
+| Compute resources | Polaris, Aurora, Sophia |
+| Storage resources | Home, Eagle |
+| Scheduler | PBS |
+| Account signup | [accounts.alcf.anl.gov](https://accounts.alcf.anl.gov/) |
+| Custom attributes | `filesystems` — comma-separated list of filesystem mounts (e.g., `"home"`, `"home,eagle"`) |
+
+### NERSC (National Energy Research Scientific Computing Center)
+
+NERSC also provides an IRI Facility API. To use it, register NERSC as a custom facility:
+
+```python
+from amsc_client.facility.config import FacilityConfig
+
+client.register_facility(
+    name="nersc",
+    config=FacilityConfig(
+        name="nersc",
+        display_name="National Energy Research Scientific Computing Center",
+        base_url="https://api.iri.nersc.gov",
+        auth_method="globus",
+        globus_client_id="YOUR_GLOBUS_CLIENT_ID",
+        globus_scope="YOUR_NERSC_SCOPE",
+    ),
+)
+
+nersc = client.facility("nersc")
+perlmutter = nersc.resource("compute")  # NERSC resource name for Perlmutter
+
+job = perlmutter.submit(
+    executable="/bin/echo",
+    arguments=["Hello from Perlmutter!"],
+    nodes=1,
+    queue="regular",
+    account="myproject",
+    duration=3600,
+    constraint="gpu",           # NERSC-specific: Slurm constraint
+)
+```
+
+| Detail | Value |
+|--------|-------|
+| API endpoint | `https://api.iri.nersc.gov/api/v1/` |
+| Compute resources | Perlmutter (`compute`) |
+| Storage resources | `scratch`, `homes`, `common`, `cfs` |
+| Scheduler | Slurm |
+| Account signup | [iris.nersc.gov](https://iris.nersc.gov/) |
+| Custom attributes | `constraint` — Slurm constraint (e.g., `"gpu"`, `"cpu"`) |
+
+### Key Differences Between Facilities
+
+The IRI API is the same across facilities. The differences are in **scheduler-specific custom attributes** — these are passed as keyword arguments to `submit()`:
+
+| Facility | Scheduler | Common Custom Attributes |
+|----------|-----------|--------------------------|
+| ALCF | PBS | `filesystems="home"` |
+| NERSC | Slurm | `constraint="gpu"` |
+
+Standard IRI parameters (`nodes`, `queue`, `account`, `duration`, `executable`, `arguments`, etc.) work identically across all facilities.
 
 ## Prerequisites
 
@@ -55,10 +140,15 @@ jupyter notebook notebooks/
 - Python 3.10+
 - A [Globus](https://www.globus.org/) account
 
-### For ALCF tutorials (facility + filesystem)
+### For ALCF tutorials
 - An [ALCF account](https://accounts.alcf.anl.gov/)
 - An active ALCF project allocation (e.g., `datascience`)
 - Access to Polaris (or another ALCF compute resource)
+
+### For NERSC
+- A [NERSC account](https://iris.nersc.gov/)
+- An active NERSC project allocation
+- Access to Perlmutter
 
 ## Troubleshooting
 
@@ -70,7 +160,7 @@ ALCF tokens embed a Keycloak identity token inside the Globus access token. This
 2. **Delete cached credentials**: `rm ~/.amsc/credentials.json`
 3. **Restart your notebook kernel** and re-run from the beginning
 
-This forces a full fresh login through ALCF's Keycloak identity provider.
+This forces a full fresh login through the facility's identity provider.
 
 ### `globus-sdk` not found
 
@@ -97,3 +187,6 @@ pip install \
 - [AmSC Python Client](https://gitlab.com/amsc2/infrastructure-and-services/amsc-interfaces/amsc-python-client) — source code and API docs
 - [AmSC Portal](https://my.american-science-cloud.org) — web interface
 - [Globus](https://www.globus.org/) — authentication and data transfer
+- [ALCF](https://www.alcf.anl.gov/) — Argonne Leadership Computing Facility
+- [NERSC](https://www.nersc.gov/) — National Energy Research Scientific Computing Center
+- [DOE IRI](https://www.exascaleproject.org/research-group/iri/) — Integrated Research Infrastructure
