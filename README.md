@@ -7,7 +7,7 @@ Tutorial notebooks for the [AmSC Python Client](https://gitlab.com/amsc2/infrast
 ### 1. Clone this repository
 
 ```bash
-git clone https://gitlab.com/amsc2/amsc-client-tutorial.git
+git clone https://github.com/amsc-interfaces/amsc-client-tutorial.git
 cd amsc-client-tutorial
 ```
 
