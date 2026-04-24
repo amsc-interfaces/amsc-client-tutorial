@@ -58,6 +58,10 @@ The IRI API has significant constraints that require specific workarounds. This 
 
 ## 2. Prerequisites
 
+### 2.0 IRI API allowlist access
+
+**Having an ALCF account and allocation is not sufficient to use the IRI API.** Your account must be added to the ALCF IRI API access list separately. Email [ALCF support](https://help.alcf.anl.gov) with your ALCF username and a description of your use case to request access. Without this, job submission returns HTTP 401.
+
 ### 2.1 amsc-client installation
 
 amsc-client is distributed via a private GitLab package registry. Three extra index URLs are required:
@@ -621,6 +625,7 @@ This disables CMA entirely and falls back to a different shared memory mechanism
 | MPI collective crash (MPI_Reduce) | MPICH version mismatch (e.g., 3.4.3 in container vs 4.1.2 on host) | Build container MPICH matching host: 4.1.2 |
 | `libpsm_infinipath` / `librdmacm` linker errors during MPICH build | `libfabric-dev` apt package installed — pulls in unwanted providers | Remove `libfabric-dev`; MPICH bundles OFI internally |
 | `ch4:ucx` MPICH fails cross-node | Ubuntu apt MPICH uses UCX, not OFI | Build MPICH from source with `--with-device=ch4:ofi` |
+| HTTP 401 on job submit (not on allowlist) | Account not added to IRI API access list | Email ALCF support with username and use case |
 | HTTP 400 on job submit | Complex bash args with special chars break GraphQL | Use base64 encoding workaround |
 | HTTP 501 on `pre_launch` | Not implemented in IRI | Embed module loads in the job script |
 | HTTP 400 on `polaris.fs.ls()` | Filesystem API only works on storage resources | Use `home.fs.ls()` or `eagle.fs.ls()` |

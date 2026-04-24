@@ -144,13 +144,22 @@ Standard IRI parameters (`nodes`, `queue`, `account`, `duration`, `executable`, 
 - An [ALCF account](https://accounts.alcf.anl.gov/)
 - An active ALCF project allocation (e.g., `datascience`)
 - Access to Polaris (or another ALCF compute resource)
+- **IRI API allowlist access** — having an ALCF account is not sufficient on its own. Email [ALCF support](https://help.alcf.anl.gov) with your ALCF username and a brief description of your use case to request access. Without it, job submission returns HTTP 401.
 
 ### For NERSC
 - A [NERSC account](https://iris.nersc.gov/)
 - An active NERSC project allocation
 - Access to Perlmutter
+- **IRI API allowlist access** — having a NERSC account is not sufficient on its own. Email [NERSC support](https://help.nersc.gov) with your NERSC username and a brief description of your use case to request access. Without it, job submission returns HTTP 401.
 
 ## Troubleshooting
+
+### 401 errors on job submission (not on the IRI API allowlist)
+
+If you receive an `HTTP 401` error when submitting a job (distinct from an authentication failure after login), your account may not be on the facility's IRI API access list. Contact the relevant support team with your username and use case:
+
+- **ALCF:** [help.alcf.anl.gov](https://help.alcf.anl.gov)
+- **NERSC:** [help.nersc.gov](https://help.nersc.gov)
 
 ### Persistent 401 errors after re-authentication (ALCF)
 

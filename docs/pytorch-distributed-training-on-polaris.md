@@ -39,6 +39,8 @@ This guide documents how to run **distributed PyTorch training** (DDP with `torc
 10. [Performance Notes](#performance-notes)
 11. [Complete Working Example](#complete-working-example)
 
+**Access requirement:** Having an ALCF account and allocation is not sufficient to use the IRI API. Your account must be added to the ALCF IRI API access list. Email [ALCF support](https://help.alcf.anl.gov) with your ALCF username and use case to request access. Without this, job submission returns HTTP 401.
+
 ---
 
 ## Quick Start
