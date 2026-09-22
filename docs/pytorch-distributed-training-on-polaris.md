@@ -49,17 +49,19 @@ This guide documents how to run **distributed PyTorch training** (DDP with `torc
 
 ```bash
 # 1. Build container (on a machine with Docker)
-docker build -t youruser/pytorch-polaris:v1 .
-docker push youruser/pytorch-polaris:v1
+# Set CONTAINER_IMAGE to your image name, e.g. yourregistry/pytorch-polaris:v1
+docker build -t $CONTAINER_IMAGE .
+docker push $CONTAINER_IMAGE
 
 # 2. Submit via IRI (Python + amsc-client)
+# Set ALCF_USERNAME and ALCF_ACCOUNT env vars before running.
 polaris.submit(
     executable="/bin/bash",
     arguments=["-l", "/path/to/run_ddp.sh"],
-    directory="/home/youruser/work",
+    directory=f"/home/{ALCF_USER}/work",
     name="ddp-job",
     queue="debug",
-    account="yourproject",
+    account=PROJECT,
     duration=1200,  # 20 minutes (in seconds)
     nodes=2,
     filesystems="home",
@@ -152,8 +154,10 @@ CMD ["/bin/bash"]
 ### Build and Push
 
 ```bash
-docker build -t youruser/pytorch-polaris:v1 .
-docker push youruser/pytorch-polaris:v1
+# Set CONTAINER_IMAGE to your image name before running, e.g.:
+# export CONTAINER_IMAGE=yourregistry/pytorch-polaris:v1
+docker build -t $CONTAINER_IMAGE .
+docker push $CONTAINER_IMAGE
 ```
 
 **Image size:** ~7.2 GB (CUDA base + PyTorch)
@@ -244,12 +248,12 @@ class ToyTransformer(torch.nn.Module):
 # ─── Training ─────────────────────────────────────────────────────────────────
 def train():
     setup()
-    
+
     rank = dist.get_rank()
     local_rank = int(os.environ["LOCAL_RANK"])
     world_size = dist.get_world_size()
     device = torch.device(f"cuda:{local_rank}")
-    
+
     # Print config (rank 0 only)
     if rank == 0:
         print("=== Toy DDP Transformer ===")
@@ -260,40 +264,40 @@ def train():
         print(f"NCCL       : {torch.cuda.nccl.version()}")
         print(f"Model      : {N_LAYERS}L d={D_MODEL} h={N_HEAD} ffn={DIM_FF}")
         print(f"Seq len    : {SEQ_LEN}  Batch/GPU: {BATCH_SIZE}\n")
-    
+
     # Model + DDP
     model = ToyTransformer(VOCAB_SIZE, D_MODEL, N_HEAD, N_LAYERS, DIM_FF).to(device)
     model = DDP(model, device_ids=[local_rank])
-    
+
     # Data
     dataset = RandomTokenDataset(VOCAB_SIZE, SEQ_LEN, size=STEPS * BATCH_SIZE * world_size)
     sampler = DistributedSampler(dataset, shuffle=True)
     loader = DataLoader(dataset, batch_size=BATCH_SIZE, sampler=sampler)
-    
+
     # Optimizer + loss
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
     criterion = torch.nn.CrossEntropyLoss()
-    
+
     # Training loop
     model.train()
     start_time = time.time()
     total_tokens = 0
-    
+
     for step, batch in enumerate(loader, 1):
         if step > STEPS:
             break
-        
+
         batch = batch.to(device)
         optimizer.zero_grad()
-        
+
         # Forward
         logits = model(batch)  # [B, L, V]
         loss = criterion(logits.view(-1, VOCAB_SIZE), batch.view(-1))
-        
+
         # Backward
         loss.backward()
         optimizer.step()
-        
+
         # Metrics (rank 0)
         if rank == 0 and step % 5 == 0:
             elapsed = time.time() - start_time
@@ -301,9 +305,9 @@ def train():
             tokens_per_sec = tokens_processed / elapsed
             print(f"step {step:3d}/{STEPS}  loss={loss.item():.4f}  "
                   f"tokens/s={tokens_per_sec:,.0f}  elapsed={elapsed:.1f}s")
-        
+
         total_tokens += BATCH_SIZE * SEQ_LEN * world_size
-    
+
     # Final stats
     if rank == 0:
         total_time = time.time() - start_time
@@ -313,7 +317,7 @@ def train():
         print(f"Tokens/sec     : {total_tokens/total_time:,.0f}")
         print(f"Tokens/sec/GPU : {total_tokens/total_time/world_size:,.0f}")
         print(f"Elapsed        : {total_time:.1f}s")
-    
+
     cleanup()
 
 if __name__ == "__main__":
@@ -340,7 +344,7 @@ Save as `run_pytorch_ddp.sh`:
 #PBS -l select=2:system=polaris
 #PBS -l walltime=00:20:00
 #PBS -q debug
-#PBS -A datascience
+#PBS -A $ALCF_ACCOUNT  # set ALCF_ACCOUNT env var
 #PBS -l filesystems=home
 
 # ─── Header explanation ───────────────────────────────────────────────────────
@@ -392,9 +396,10 @@ export APPTAINER_CACHEDIR=/local/scratch/apptainer-cachedir
 mkdir -p ${APPTAINER_TMPDIR} ${APPTAINER_CACHEDIR}
 
 # ─── Pull container (first run only) ──────────────────────────────────────────
+# CONTAINER_IMAGE must be set in the job environment (e.g. docker.io/yourregistry/pytorch-polaris:v1)
 if [ ! -f "${SIF}" ]; then
     echo "Pulling container..."
-    apptainer pull ${SIF} docker://youruser/pytorch-polaris:v1
+    apptainer pull ${SIF} docker://${CONTAINER_IMAGE}
 fi
 
 # ─── Launch: mpiexec spawns one torchrun per node ─────────────────────────────
@@ -480,32 +485,36 @@ export APPTAINERENV_NCCL_DEBUG_SUBSYS=ALL # All subsystems
 ```python
 import amsc_client
 import base64
+import os
+import time
 
-# ─── Authenticate ─────────────────────────────────────────────────────────────
-CLIENT_ID = "your-iri-client-id"
-client = amsc_client.Client(
-    base_url='https://api.american-science-cloud.org/api/current',
-    auth_method="globus",
-    globus_client_id=CLIENT_ID,
-)
-alcf = client.facility("alcf")
+# ─── Authenticate (amsc-client 0.6.0 — ALCF Globus auth resolved automatically) ──
+# Set ALCF_USERNAME and ALCF_ACCOUNT as environment variables.
+ALCF_USER = os.environ.get("ALCF_USERNAME", "your-alcf-username")
+PROJECT   = os.environ.get("ALCF_ACCOUNT",  "your-allocation")
+
+client  = amsc_client.Client()
+alcf    = client.facility("alcf")
 polaris = alcf.resource("Polaris")
+home    = alcf.resource("Home")
 
-# ─── Write script to Polaris (base64 workaround) ──────────────────────────────
-WORK_DIR = "/home/youruser/pytorch-test"
+# ─── Write script to Polaris (base64 fallback workaround) ─────────────────────
+# The IRI API does not yet support direct file upload; base64 decode via a
+# short job is the current workaround for transferring scripts to Polaris.
+WORK_DIR = f"/home/{ALCF_USER}/pytorch-test"
 with open('run_pytorch_ddp.sh') as f:
     script = f.read()
 script_b64 = base64.b64encode(script.encode()).decode()
 
 # Submit script-writing job first
-cmd = f"printf '%s' '{script_b64}' | base64 -d > {WORK_DIR}/run_pytorch_ddp.sh && chmod +x {WORK_DIR}/run_pytorch_ddp.sh"
+cmd = f"mkdir -p {WORK_DIR} && printf '%s' '{script_b64}' | base64 -d > {WORK_DIR}/run_pytorch_ddp.sh && chmod +x {WORK_DIR}/run_pytorch_ddp.sh"
 setup_job = polaris.submit(
     executable="/bin/bash",
     arguments=["-c", cmd],
-    directory=WORK_DIR,
+    directory=f"/home/{ALCF_USER}",
     name="setup",
     queue="debug",
-    account="yourproject",
+    account=PROJECT,
     duration=300,  # 5 minutes (minimum for debug queue)
     nodes=1,
     filesystems="home",
@@ -513,15 +522,8 @@ setup_job = polaris.submit(
 print(f"Setup job: {setup_job.id}")
 
 # ─── Wait for setup to complete ───────────────────────────────────────────────
-import time
-for _ in range(60):
-    time.sleep(10)
-    try:
-        raw = alcf._get_job_raw(polaris.id, str(setup_job.id))
-        if raw.state in ("complete", "failed", "cancelled"):
-            break
-    except:
-        break  # Job cleared from queue
+setup_job.wait(timeout=600, poll_interval=10)
+assert setup_job.exit_code == 0, f"Script write failed: {setup_job.state}"
 
 # Extra buffer for queue to clear (debug queue = 1 job max)
 time.sleep(30)
@@ -533,21 +535,21 @@ ddp_job = polaris.submit(
     directory=WORK_DIR,
     name="pt-ddp",
     queue="debug",
-    account="yourproject",
+    account=PROJECT,
     duration=1200,  # 20 minutes
     nodes=2,
     filesystems="home",
 )
 print(f"DDP job: {ddp_job.id}")
+ddp_job.wait(timeout=1800, poll_interval=15)
+print(f"Done: state={ddp_job.state}, exit={ddp_job.exit_code}")
 
 # ─── Fetch output ─────────────────────────────────────────────────────────────
-# (Wait ~10-15 min for job to complete)
-time.sleep(600)  # Adjust based on queue wait time
-
-home = alcf.resource("Home")
-stdout_task = home.fs.view(f"{WORK_DIR}/pt-ddp.stdout")
-stdout_task.wait(timeout=60, poll_interval=5)
-print(stdout_task.result['output']['content'].decode('utf-8'))
+# Filesystem Tasks are synchronously resolved — use .result directly.
+time.sleep(5)
+stdout_task = home.fs.head(f"{WORK_DIR}/pt-ddp.stdout")
+content = stdout_task.result.get('output', {}).get('content', '')
+print(content)
 ```
 
 ### Queue Limits
@@ -677,9 +679,10 @@ pytorch-test/
 
 ```bash
 # 1. Build container (local machine)
+# Set CONTAINER_IMAGE env var, e.g.: export CONTAINER_IMAGE=yourregistry/pytorch-polaris:v1
 cd pytorch-test
-docker build -t youruser/pytorch-polaris:v1 .
-docker push youruser/pytorch-polaris:v1
+docker build -t $CONTAINER_IMAGE .
+docker push $CONTAINER_IMAGE
 
 # 2. Submit via IRI (Python script or interactive session)
 python submit_job.py
@@ -720,7 +723,7 @@ python check_output.py
 1. **No-MPICH container approach** — simpler than trying to match host/container MPI versions
 2. **`mpiexec` wrapping `torchrun`** — clean separation of concerns (host launches, container trains)
 3. **Explicit `LD_PRELOAD` for NCCL plugin** — `LD_LIBRARY_PATH` alone was insufficient
-4. **Base64 file transfer** — only reliable way to write files via IRI (no direct `scp`/`rsync`)
+4. **Base64 file transfer** — current fallback workaround for writing scripts via IRI (no direct `scp`/`rsync`; prefer direct file upload if/when the IRI API adds it)
 
 ### Pitfalls to Avoid
 
@@ -737,16 +740,16 @@ For agents orchestrating workflows:
 def submit_ddp_training(script_path, nodes=2, walltime_min=20):
     """
     Submit PyTorch DDP job with automatic retries and queue handling.
-    
+
     Returns job ID or raises exception after max retries.
     """
     # 1. Write script (with retry on queue limit)
     setup_job = submit_with_retry(write_script_job, max_attempts=3, delay=60)
-    
+
     # 2. Wait for queue to clear
     wait_for_job_clear(setup_job.id, timeout=300)
     time.sleep(30)  # Extra buffer
-    
+
     # 3. Submit DDP job
     ddp_job = submit_with_retry(
         ddp_job_spec,
@@ -755,7 +758,7 @@ def submit_ddp_training(script_path, nodes=2, walltime_min=20):
         duration=walltime_min * 60,  # Convert to seconds
         nodes=nodes,
     )
-    
+
     # 4. Poll and return when complete
     return wait_for_completion(ddp_job.id, poll_interval=30, timeout=3600)
 ```
@@ -782,13 +785,13 @@ This guide synthesized from live debugging sessions (2026-04-11 to 2026-04-13) w
 3. Queue limit handling quirks
 4. PBS walltime minimum/maximum constraints
 
-**Human collaborator:** Taylor Childers (ALCF, `parton` account)  
-**Test system:** Polaris debug queue, `datascience` project  
+**Human collaborator:** ALCF staff (see ALCF_USERNAME env var for your username)
+**Test system:** Polaris debug queue (replace with your allocation via `ALCF_ACCOUNT`)
 **Total iterations to working solution:** 6 job submissions
 
 ---
 
-**Last updated:** 2026-04-13  
-**Guide version:** 1.0  
-**Tested PyTorch version:** 2.5.1+cu124  
+**Last updated:** 2026-04-13
+**Guide version:** 1.0
+**Tested PyTorch version:** 2.5.1+cu124
 **Tested Polaris software stack:** 2025-09-25 conda env

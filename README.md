@@ -1,8 +1,6 @@
-# These are out of order for the moment.
-
 # AmSC Client Tutorials
 
-Tutorial notebooks for the [AmSC Python Client](https://gitlab.com/amsc2/infrastructure-and-services/amsc-interfaces/amsc-python-client) — a unified SDK for the American Science Cloud APIs.
+Tutorial notebooks for the [AmSC Python Client](https://gitlab.com/amsc2/infrastructure-and-services/amsc-interfaces/amsc-python-client) — a unified SDK for the American Science Cloud APIs, targeting `amsc-client==0.6.0`.
 
 ## Getting Started
 
@@ -27,9 +25,21 @@ source venv/bin/activate    # Linux/macOS
 pip install -r requirements.txt
 ```
 
-This installs the AmSC client, Globus SDK, and Jupyter from the public AmSC package registries.
+This installs `amsc-client==0.6.0` and Jupyter from the four public AmSC GitLab package registries.
 
-### 4. Launch Jupyter
+### 4. Set up authentication
+
+Central-service tutorials (catalog) require an **AmSC Keycard** — an OAuth2 access token for the AmSC staging API:
+
+```bash
+export AMSC_TOKEN='<your-amsc-keycard>'
+```
+
+The AmSC staging API endpoint is `https://api.staging.american-science-cloud.org/api/current`.
+
+Facility tutorials (ALCF, NERSC, filesystem) use independent Globus-based authenticators. The Globus login is triggered automatically on the first facility call — a browser window will open.
+
+### 5. Launch Jupyter
 
 ```bash
 jupyter notebook notebooks/
@@ -39,39 +49,82 @@ jupyter notebook notebooks/
 
 | Notebook | Description | Auth Required |
 |----------|-------------|---------------|
-| [**Catalog Explorer**](notebooks/catalog_explorer.ipynb) | Browse the AmSC data catalog — search, filter, and inspect scientific works and artifacts on staging | Globus (AmSC) |
-| [**Catalog Tutorial**](notebooks/catalog_tutorial.ipynb) | Full CRUD operations — create, update, search, and delete catalog entities | Globus (AmSC) + write access |
-| [**Facility Tutorial**](notebooks/facility_tutorial.ipynb) | Connect to a DOE facility, list resources, submit a job, monitor status, and read output via the filesystem API | Globus (facility) |
-| [**Filesystem Tutorial**](notebooks/filesystem_tutorial.ipynb) | Filesystem operations on facility resources — ls, head, tail, stat, cp, mv, mkdir, and more | Globus (facility) |
+| [**Catalog Explorer**](notebooks/catalog_explorer.ipynb) | Browse the AmSC data catalog — search, filter, and inspect scientific works and artifacts on staging | `AMSC_TOKEN` (AmSC Keycard) |
+| [**Catalog Tutorial**](notebooks/catalog_tutorial.ipynb) | Full CRUD operations — create, update, search, and delete catalog entities | `AMSC_TOKEN` + write access |
+| [**ALCF Facility Tutorial**](notebooks/alcf_facility_tutorial.ipynb) | Connect to ALCF, explore Polaris and other resources, and optionally submit a job | ALCF Globus (facility-native) |
+| [**NERSC Facility Tutorial**](notebooks/nersc_facility_tutorial.ipynb) | Connect to NERSC, explore Perlmutter resources, and optionally submit a job | NERSC Globus (facility-native) |
+| [**Filesystem Tutorial**](notebooks/filesystem_tutorial.ipynb) | Filesystem operations on ALCF resources — ls, head, tail, stat, cp, mv, mkdir, rm, and more | ALCF Globus (facility-native) |
 
 ### Recommended order
 
-1. **Catalog Explorer** — read-only, works for everyone with a Globus account
-2. **Facility Tutorial** — requires an account and allocation at a DOE facility
-3. **Filesystem Tutorial** — requires an account at a DOE facility
-4. **Catalog Tutorial** — requires write access to a data catalog
+1. **Catalog Explorer** — read-only, requires only an AmSC Keycard
+2. **ALCF Facility Tutorial** — requires an ALCF account, allocation, and IRI API access
+3. **NERSC Facility Tutorial** — requires a NERSC account, allocation, and IRI API access
+4. **Filesystem Tutorial** — requires an ALCF account and IRI API access
+5. **Catalog Tutorial** — requires write access to a staging catalog
+
+## Authentication architecture
+
+The client uses **two independent credential domains**:
+
+```text
+AMSC_TOKEN (AmSC Keycard / access token)
+  → staging AmSC services: Catalog, Account, Workflow, MLflow
+  → base URL: https://api.staging.american-science-cloud.org/api/current
+
+Facility-native Globus authenticator (ALCF or NERSC)
+  → direct IRI v1 facility API (alcf or nersc built-in)
+  → no AMSC_TOKEN required for facility-only access
+```
+
+**Important:** `AMSC_TOKEN` must be an AmSC access token (Keycard), not an OIDC ID token (Passport). Never print or embed tokens in notebooks.
+
+### Verify both authentication domains
+
+After obtaining both credentials, run the opt-in, read-only mixed-auth smoke test:
+
+```bash
+export AMSC_TOKEN='<your-amsc-keycard>'
+export ALCF_IRI_TOKEN='<your-alcf-iri-token>'
+python scripts/smoke_mixed_auth.py
+```
+
+It uses one `Client`, but keeps the central Keycard and facility-native ALCF
+credential independent. It proves each credential against a protected account
+read and performs no job submissions, catalog writes, or filesystem mutations.
 
 ## Supported Facilities
 
-The AmSC Python Client uses the [DOE IRI Facility API](https://www.exascaleproject.org/research-group/iri/) standard, which provides a uniform interface across DOE computing facilities. The tutorial notebooks demonstrate ALCF (Polaris) but the same API works at any IRI-compliant facility.
+Both ALCF and NERSC are **built-in** facilities — no manual registration required:
+
+```python
+from amsc_client import Client
+
+client = Client()  # No token needed for facility-only access
+
+alcf  = client.facility("alcf")
+nersc = client.facility("nersc")
+```
 
 ### ALCF (Argonne Leadership Computing Facility)
 
-ALCF is built into the client — no extra configuration needed:
-
 ```python
-alcf = client.facility("alcf")
+alcf    = client.facility("alcf")
 polaris = alcf.resource("Polaris")
 
-job = polaris.submit(
-    executable="/bin/echo",
-    arguments=["Hello from Polaris!"],
-    nodes=1,
-    queue="debug",
-    account="myproject",
-    duration=300,
-    filesystems="home",         # ALCF-specific: PBS filesystem mounts
-)
+# Set SUBMIT_JOB = True to actually submit; False (default) is safe to explore
+SUBMIT_JOB = False
+
+if SUBMIT_JOB:
+    job = polaris.submit(
+        executable="/bin/echo",
+        arguments=["Hello from Polaris!"],
+        nodes=1,
+        queue="debug",
+        account=os.environ["ALCF_ACCOUNT"],
+        duration=300,
+        filesystems="home",     # ALCF-specific: PBS filesystem mounts
+    )
 ```
 
 | Detail | Value |
@@ -85,35 +138,25 @@ job = polaris.submit(
 
 ### NERSC (National Energy Research Scientific Computing Center)
 
-NERSC also provides an IRI Facility API. To use it, register NERSC as a custom facility:
+NERSC is a built-in facility in `amsc-client 0.6.0` — use `client.facility("nersc")` directly:
 
 ```python
-from amsc_client.facility.config import FacilityConfig
+nersc      = client.facility("nersc")
+perlmutter = nersc.resource("compute")
 
-client.register_facility(
-    name="nersc",
-    config=FacilityConfig(
-        name="nersc",
-        display_name="National Energy Research Scientific Computing Center",
-        base_url="https://api.iri.nersc.gov",
-        auth_method="globus",
-        globus_client_id="YOUR_GLOBUS_CLIENT_ID",
-        globus_scope="YOUR_NERSC_SCOPE",
-    ),
-)
+# Set SUBMIT_JOB = True to actually submit; False (default) is safe to explore
+SUBMIT_JOB = False
 
-nersc = client.facility("nersc")
-perlmutter = nersc.resource("compute")  # NERSC resource name for Perlmutter
-
-job = perlmutter.submit(
-    executable="/bin/echo",
-    arguments=["Hello from Perlmutter!"],
-    nodes=1,
-    queue="regular",
-    account="myproject",
-    duration=3600,
-    constraint="gpu",           # NERSC-specific: Slurm constraint
-)
+if SUBMIT_JOB:
+    job = perlmutter.submit(
+        executable="/bin/echo",
+        arguments=["Hello from Perlmutter!"],
+        nodes=1,
+        queue="debug",
+        account=os.environ["NERSC_ACCOUNT"],
+        duration=300,
+        constraint="gpu",       # NERSC-specific: Slurm constraint
+    )
 ```
 
 | Detail | Value |
@@ -125,72 +168,52 @@ job = perlmutter.submit(
 | Account signup | [iris.nersc.gov](https://iris.nersc.gov/) |
 | Custom attributes | `constraint` — Slurm constraint (e.g., `"gpu"`, `"cpu"`) |
 
-### Key Differences Between Facilities
-
-The IRI API is the same across facilities. The differences are in **scheduler-specific custom attributes** — these are passed as keyword arguments to `submit()`:
-
-| Facility | Scheduler | Common Custom Attributes |
-|----------|-----------|--------------------------|
-| ALCF | PBS | `filesystems="home"` |
-| NERSC | Slurm | `constraint="gpu"` |
-
-Standard IRI parameters (`nodes`, `queue`, `account`, `duration`, `executable`, `arguments`, etc.) work identically across all facilities.
-
 ## Prerequisites
 
 ### For all tutorials
-- Python 3.10+
+- Python 3.11+
 - A [Globus](https://www.globus.org/) account
+
+### For catalog tutorials
+- An AmSC Keycard (access token) in `AMSC_TOKEN`
+- For write operations: staging catalog write access
 
 ### For ALCF tutorials
 - An [ALCF account](https://accounts.alcf.anl.gov/)
-- An active ALCF project allocation (e.g., `datascience`)
-- Access to Polaris (or another ALCF compute resource)
-- **IRI API allowlist access** — having an ALCF account is not sufficient on its own. Email [ALCF support](https://help.alcf.anl.gov) with your ALCF username and a brief description of your use case to request access. Without it, job submission returns HTTP 401.
+- An active ALCF project allocation
+- **IRI API allowlist access** — having an ALCF account is not sufficient. Email [ALCF support](https://help.alcf.anl.gov) with your ALCF username and use case to request access. Without it, job submission returns HTTP 401.
 
-### For NERSC
+### For NERSC tutorials
 - A [NERSC account](https://iris.nersc.gov/)
 - An active NERSC project allocation
-- Access to Perlmutter
-- **IRI API allowlist access** — having a NERSC account is not sufficient on its own. Email [NERSC support](https://help.nersc.gov) with your NERSC username and a brief description of your use case to request access. Without it, job submission returns HTTP 401.
+- **IRI API allowlist access** — Email [NERSC support](https://help.nersc.gov) with your NERSC username and use case. Without it, job submission returns HTTP 401.
 
 ## Troubleshooting
 
 ### 401 errors on job submission (not on the IRI API allowlist)
 
-If you receive an `HTTP 401` error when submitting a job (distinct from an authentication failure after login), your account may not be on the facility's IRI API access list. Contact the relevant support team with your username and use case:
+If you receive an `HTTP 401` error when submitting a job (distinct from a login failure), your account may not be on the facility's IRI API access list. Contact the relevant support team:
 
 - **ALCF:** [help.alcf.anl.gov](https://help.alcf.anl.gov)
 - **NERSC:** [help.nersc.gov](https://help.nersc.gov)
 
-### Persistent 401 errors after re-authentication (ALCF)
+### ALCF high-assurance token expiry
 
-ALCF tokens embed a Keycloak identity token inside the Globus access token. This embedded token can expire even while the Globus token itself remains valid. If you see repeated `AuthenticationError: Authentication failed (401)` errors even after re-authenticating:
+ALCF uses a high-assurance Globus auth policy — the login session carries a time-limited assurance level that can expire independently of the Globus token itself. If you see repeated `AuthenticationError` after a previously successful login:
 
-1. **Clear your browser cookies** for `globus.org` and `globusid.org` domains
-2. **Delete cached credentials**: `rm ~/.amsc/credentials.json`
-3. **Restart your notebook kernel** and re-run from the beginning
-
-This forces a full fresh login through the facility's identity provider.
-
-### `globus-sdk` not found
-
-If you get an import error for `globus_sdk`, make sure you installed from the requirements file:
-
-```bash
-pip install -r requirements.txt
-```
+1. **Re-authenticate interactively** using the official ALCF login flow at [alcf.anl.gov](https://www.alcf.anl.gov) with your ALCF (not personal Globus) identity. Clearing browser cookies or deleting the local credential cache alone is not sufficient — the high-assurance session is issued by ALCF's Keycloak and must be renewed through the official ALCF identity portal.
+2. After renewing your ALCF session, restart the notebook kernel and re-run from the beginning.
 
 ### Package not found
 
-If `amsc-client` can't be found, the GitLab package registry URLs may not be resolving. Try installing manually:
+`amsc-client 0.6.0` is distributed across four public GitLab package registries. If `pip install -r requirements.txt` fails, try:
 
 ```bash
-pip install \
+pip install amsc-client==0.6.0 \
   --extra-index-url https://gitlab.com/api/v4/projects/77567162/packages/pypi/simple \
   --extra-index-url https://gitlab.com/api/v4/projects/76368190/packages/pypi/simple \
   --extra-index-url https://gitlab.com/api/v4/projects/80654726/packages/pypi/simple \
-  amsc-client
+  --extra-index-url https://gitlab.com/api/v4/projects/82001936/packages/pypi/simple
 ```
 
 ## Links
