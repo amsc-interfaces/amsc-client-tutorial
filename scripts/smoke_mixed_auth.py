@@ -80,6 +80,10 @@ def main() -> int:
         print("[OK] staging protected account read authenticated")
 
         alcf = client.facility("alcf")
+        # amsc-client 0.6.0 has no public account/projects method on
+        # FacilityClient. This deliberately narrow diagnostic escape hatch is
+        # required to prove the ALCF bearer against a protected IRI v1 route;
+        # public resources() discovery is not authentication evidence.
         projects = alcf._client()._service_client._account_api.get_projects()
         print(f"[OK] ALCF protected account read authenticated ({len(projects)} project(s))")
     except Exception as exc:

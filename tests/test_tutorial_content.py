@@ -392,7 +392,11 @@ class TestCatalogTutorial:
     def test_catalog_mutations_are_structurally_guarded(self, nb):
         assert_calls_are_guarded(
             nb,
-            ("catalog.create_work", "catalog.create_artifact", "catalog.delete"),
+            (
+                "catalog.create_scientific_work",
+                "catalog.create_artifact",
+                "catalog.delete",
+            ),
             "ENABLE_WRITES",
         )
 
