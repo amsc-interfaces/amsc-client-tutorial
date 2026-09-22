@@ -36,7 +36,7 @@ Running a containerized MPI+GPU application on ALCF Polaris entirely through the
      │                                       │
      └─ amsc-client ──────── IRI API ───────>│
           │                                  ├─ PBS job: pull SIF
-          │                                  ├─ PBS job: write run script (base64)
+          │                                  ├─ PBS job: write run script (workaround)
           │                                  └─ PBS job: mpiexec + apptainer exec
           │                                       │
           └─ Read stdout/stderr ◄── IRI API ──────┘
@@ -48,9 +48,9 @@ The IRI API has significant constraints that require specific workarounds. This 
 
 ### Key facts
 
-- **ALCF user:** `parton`, **project:** `datascience`
-- **Container registry:** Docker Hub (`jtchilders/pepper-polaris`)
-- **amsc-client version:** 0.4.1
+- **ALCF user:** `$ALCF_USERNAME` (replace with your username), **project:** `$ALCF_ACCOUNT`
+- **Container registry:** Docker Hub (`$CONTAINER_IMAGE` — replace with your image)
+- **amsc-client version:** 0.6.0 *(observations from the configuration above; verify against current ALCF documentation)*
 - **Polaris nodes:** NVIDIA A100 GPUs (Ampere80), Cray Slingshot network, PBS scheduler
 - **Apptainer version on Polaris:** 1.4.1
 
@@ -67,7 +67,7 @@ The IRI API has significant constraints that require specific workarounds. This 
 amsc-client is distributed via a private GitLab package registry. Three extra index URLs are required:
 
 ```bash
-pip install amsc-client==0.4.1 \
+pip install amsc-client==0.6.0 \
   --extra-index-url https://gitlab.com/api/v4/projects/... \
   --extra-index-url https://... \
   --extra-index-url https://...
@@ -83,20 +83,9 @@ Auth uses cached Globus credentials. The client reads from `~/.amsc/credentials.
 ```python
 from amsc_client import Client
 
-GLOBUS_APP_ID    = 'e4f48665-38b5-4833-a89e-849c71f5b3e3'
-RESOURCE_SERVER  = '8b84fc2d-49e9-49ea-b54d-b3a29a70cf31'
-
-client = Client(
-    base_url='https://api.american-science-cloud.org/api/current',
-    auth_method="globus",
-    globus_client_id=GLOBUS_APP_ID,
-    requested_scopes=(
-        f'openid profile email '
-        f'https://auth.globus.org/scopes/{GLOBUS_APP_ID}/amsc_test'
-    ),
-    resource_server=RESOURCE_SERVER,
-    use_id_token=True,
-)
+# amsc-client 0.6.0 — ALCF facility access (no central-service token required)
+# The ALCF Globus authenticator is resolved automatically on the first facility call.
+client = Client()
 ```
 
 On first run, Globus will prompt for browser-based authentication. After that, credentials are cached.
@@ -129,21 +118,21 @@ If you see `error -61` from the macOS keychain when pushing images:
 
 | Operation | Status | Notes |
 |-----------|--------|-------|
-| `ls` | ✅ Working | On Home/Eagle only |
-| `head` | ✅ Working | Read first N bytes |
-| `view` | ✅ Working | Read full file content |
-| `chmod` | ✅ Working | |
-| `chown` | ✅ Working | |
-| `tail` | ❌ 501 Not Implemented | |
-| `stat` | ❌ 501 Not Implemented | |
-| `checksum` | ❌ 501 Not Implemented | |
-| `file` | ❌ 501 Not Implemented | |
-| `download` | ❌ 501 Not Implemented | |
-| `mkdir` | ❌ 501 Not Implemented | Create dirs via job instead |
-| `cp` | ❌ 501 Not Implemented | |
-| `mv` | ❌ 501 Not Implemented | |
-| `rm` | ❌ 501 Not Implemented | |
-| `symlink` | ❌ 501 Not Implemented | |
+| `ls` | ✅ Public 0.6 surface | On Home/Eagle only |
+| `head` | ✅ Public 0.6 surface | Read first N lines/bytes |
+| `tail` | ✅ Public 0.6 surface | Read last N lines/bytes |
+| `stat` | ✅ Public 0.6 surface | File metadata |
+| `checksum` | ✅ Public 0.6 surface | |
+| `download` | ✅ Public 0.6 surface | Remote → local |
+| `upload` | ✅ Public 0.6 surface | Local → remote (preferred transfer method) |
+| `mkdir` | ✅ Public 0.6 surface | |
+| `cp` | ✅ Public 0.6 surface | |
+| `mv` | ✅ Public 0.6 surface | |
+| `rm` | ✅ Public 0.6 surface | |
+| `symlink` | ✅ Public 0.6 surface | |
+| `chmod` | ✅ Public 0.6 surface | |
+| `compress` | ✅ Public 0.6 surface | |
+| `extract` | ✅ Public 0.6 surface | |
 | `compress` | ❌ 501 Not Implemented | |
 | `extract` | ❌ 501 Not Implemented | |
 
@@ -154,13 +143,17 @@ If you see `error -61` from the macOS keychain when pushing images:
 ### 3.2 Job submission
 
 ```python
+ALCF_USER = os.environ.get("ALCF_USERNAME", "your-alcf-username")  # set ALCF_USERNAME
+PROJECT   = os.environ.get("ALCF_ACCOUNT",  "your-allocation")      # set ALCF_ACCOUNT
+WORK_DIR  = f"/home/{ALCF_USER}/my-iri-job"
+
 job = polaris.submit(
     executable="/bin/bash",
-    arguments=["-l", "/home/parton/script.sh"],
-    directory="/home/parton/workdir",
+    arguments=["-l", f"{WORK_DIR}/script.sh"],
+    directory=f"{WORK_DIR}",
     name="my-job",
     queue="debug",          # debug | debug-scaling | prod
-    account="datascience",
+    account=PROJECT,
     duration=1800,          # seconds
     nodes=2,
     filesystems="home",
@@ -182,13 +175,6 @@ The `directory` parameter in `submit()` controls where output files are written.
 
 ### 3.4 Critical API limitations
 
-**`pre_launch` parameter: NOT IMPLEMENTED**
-```python
-# This returns 501:
-polaris.submit(..., pre_launch="module load apptainer")  # ❌ BROKEN
-```
-Use a shell script submitted as the job instead.
-
 **Complex bash arguments break GraphQL parser:**
 ```python
 # HTTP 400 — colons, dollar signs, quotes break the parser:
@@ -196,11 +182,11 @@ polaris.submit(executable="/bin/bash",
     arguments=["-c", "export HTTP_PROXY=http://proxy:3128 && mpiexec ..."])  # ❌ BROKEN
 ```
 
-**The workaround for both:** Two-step pattern — write a script via base64, then execute it.
+**The workaround for both:** Two-step pattern — write a script via base64 encoding (a fallback for the GraphQL character restrictions), then execute it.
 
-### 3.5 The base64 script transfer pattern
+### 3.5 The base64 script transfer pattern (fallback workaround)
 
-Because you can't upload files directly and complex bash args break GraphQL, use this two-step pattern for every non-trivial job:
+Prefer the public `home.fs.upload(local_path, remote_path)` method for normal file staging. The two-step base64 pattern below is retained only as a historical fallback for deployments where direct upload is unavailable or where complex shell arguments cannot be represented reliably.
 
 ```python
 import base64
@@ -319,8 +305,9 @@ export APPTAINER_TMPDIR=/local/scratch/apptainer-tmpdir
 export APPTAINER_CACHEDIR=/local/scratch/apptainer-cachedir
 mkdir -p $APPTAINER_TMPDIR $APPTAINER_CACHEDIR
 
-apptainer pull /home/parton/pepper-iri-test/pepper-polaris-v4.sif \
-    docker://docker.io/jtchilders/pepper-polaris:latest
+# Replace $ALCF_USERNAME and $CONTAINER_IMAGE with your values (set as env vars):
+apptainer pull /home/$ALCF_USERNAME/my-iri-job/my-app-v4.sif \
+    docker://docker.io/$CONTAINER_IMAGE
 ```
 
 Pull time: ~2 minutes for a 4GB SIF (3.9GB compressed from 12.6GB Docker image).
@@ -338,23 +325,14 @@ import base64
 import time
 from amsc_client import Client
 
-GLOBUS_APP_ID   = 'e4f48665-38b5-4833-a89e-849c71f5b3e3'
-RESOURCE_SERVER = '8b84fc2d-49e9-49ea-b54d-b3a29a70cf31'
-ALCF_USER = 'parton'
-PROJECT   = 'datascience'
+import os
+
+ALCF_USER = os.environ.get("ALCF_USERNAME", "your-alcf-username")  # set ALCF_USERNAME
+PROJECT   = os.environ.get("ALCF_ACCOUNT", "your-allocation")      # set ALCF_ACCOUNT
 WORK_DIR  = f"/home/{ALCF_USER}/my-iri-job"
 
-client = Client(
-    base_url='https://api.american-science-cloud.org/api/current',
-    auth_method="globus",
-    globus_client_id=GLOBUS_APP_ID,
-    requested_scopes=(
-        f'openid profile email '
-        f'https://auth.globus.org/scopes/{GLOBUS_APP_ID}/amsc_test'
-    ),
-    resource_server=RESOURCE_SERVER,
-    use_id_token=True,
-)
+# amsc-client 0.6.0 — ALCF facility access (Globus auth is resolved automatically)
+client = Client()
 
 alcf    = client.facility("alcf")
 polaris = alcf.resource("Polaris")
@@ -627,7 +605,6 @@ This disables CMA entirely and falls back to a different shared memory mechanism
 | `ch4:ucx` MPICH fails cross-node | Ubuntu apt MPICH uses UCX, not OFI | Build MPICH from source with `--with-device=ch4:ofi` |
 | HTTP 401 on job submit (not on allowlist) | Account not added to IRI API access list | Email ALCF support with username and use case |
 | HTTP 400 on job submit | Complex bash args with special chars break GraphQL | Use base64 encoding workaround |
-| HTTP 501 on `pre_launch` | Not implemented in IRI | Embed module loads in the job script |
 | HTTP 400 on `polaris.fs.ls()` | Filesystem API only works on storage resources | Use `home.fs.ls()` or `eagle.fs.ls()` |
 | Old SIF used despite new Docker push | `apptainer pull :latest` hits Polaris cache | Use versioned SIF filenames; delete old SIF before pull |
 | `docker login` keychain error -61 (macOS) | macOS keychain credential store issue | Remove `"credsStore": "osxkeychain"` from `~/.docker/config.json` |
@@ -707,8 +684,9 @@ def read_output(home, work_dir, job_name, max_chars=10000):
     for label, fname in [("stdout", f"{job_name}.stdout"),
                           ("stderr", f"{job_name}.stderr")]:
         try:
-            task = home.fs.view(f"{work_dir}/{fname}")
-            task.wait(timeout=60)
+            # fs.head() is the public 0.6 surface for reading file content.
+            # Filesystem Tasks are synchronously resolved — use .result directly.
+            task = home.fs.head(f"{work_dir}/{fname}")
             r = task.result
             # result may be a dict or raw string depending on client version
             if isinstance(r, dict):
@@ -741,15 +719,15 @@ For MPI container jobs, stderr is more informative than stdout:
 
 A clean 2-node run with MPICH 4.1.2 + CMA disabled produces ~8KB of stderr (mostly Kokkos init). A failing run with stack traces produces ~25KB+.
 
-### 10.3 Tail workaround
+### 10.3 Reading the tail of large files
 
-Since `home.fs.tail()` returns 501, read the full file with `view()` and take the last N chars:
+`fs.tail()` is supported in the 0.6 public surface. To get just the end of a large output file:
 
 ```python
-task = home.fs.view(f"{work_dir}/job.stderr")
-task.wait(timeout=60)
+task = home.fs.tail(f"{work_dir}/job.stderr")
+# Filesystem Tasks are synchronously resolved — .result is available immediately.
 content = task.result.get('output', {}).get('content', '')
-print(content[-3000:])  # Last 3000 chars
+print(content[-3000:])  # Last 3000 chars (or the tail result itself)
 ```
 
 ---
@@ -772,8 +750,8 @@ print(content[-3000:])  # Last 3000 chars
 #   4. NO libfabric-dev (causes linker errors; MPICH uses embedded OFI)
 #   5. -fno-lto (GCC LTO + CUDA fatbinData conflict)
 #
-# Build: docker build -t pepper-polaris .
-# Push:  docker push jtchilders/pepper-polaris:latest
+# Build: docker build -t my-app .
+# Push:  docker push $CONTAINER_IMAGE  (set CONTAINER_IMAGE env var)
 
 FROM nvidia/cuda:12.6.3-devel-ubuntu24.04
 
@@ -865,23 +843,14 @@ import base64
 import time
 from amsc_client import Client
 
-GLOBUS_APP_ID   = 'e4f48665-38b5-4833-a89e-849c71f5b3e3'
-RESOURCE_SERVER = '8b84fc2d-49e9-49ea-b54d-b3a29a70cf31'
-ALCF_USER = 'parton'
-PROJECT   = 'datascience'
+import os
+
+ALCF_USER = os.environ.get("ALCF_USERNAME", "your-alcf-username")  # set ALCF_USERNAME
+PROJECT   = os.environ.get("ALCF_ACCOUNT", "your-allocation")      # set ALCF_ACCOUNT
 WORK_DIR  = f"/home/{ALCF_USER}/pepper-iri-test"
 
-client = Client(
-    base_url='https://api.american-science-cloud.org/api/current',
-    auth_method="globus",
-    globus_client_id=GLOBUS_APP_ID,
-    requested_scopes=(
-        f'openid profile email '
-        f'https://auth.globus.org/scopes/{GLOBUS_APP_ID}/amsc_test'
-    ),
-    resource_server=RESOURCE_SERVER,
-    use_id_token=True,
-)
+# amsc-client 0.6.0 — ALCF facility access (Globus auth resolved automatically)
+client = Client()
 
 alcf    = client.facility("alcf")
 polaris = alcf.resource("Polaris")
@@ -936,7 +905,7 @@ mpiexec -n $RANKS -ppn 4 --hostfile $PBS_NODEFILE \
     apptainer exec --fakeroot --nv --writable-tmpfs \
     -B /opt -B /var/run/palsd/ \
     -B /usr/lib64:/host/usr/lib64 \
-    -B /home/parton:/home/parton \
+    -B $HOME:$HOME \
     --pwd $RUNDIR \
     "$SIF" \
     pepper \
@@ -996,8 +965,8 @@ print(f"  Done: state={run_job.state}, exit={run_job.exit_code}")
 time.sleep(5)
 for label, fname in [("STDOUT", "mpi-test7.stdout"), ("STDERR", "mpi-test7.stderr")]:
     try:
-        task = home.fs.view(f"{WORK_DIR}/{fname}")
-        task.wait(timeout=60)
+        # Filesystem Tasks are synchronously resolved — use .result directly.
+        task = home.fs.head(f"{WORK_DIR}/{fname}")
         r = task.result
         content = r.get('output', r).get('content', '') if isinstance(r, dict) else str(r)
         if content.strip():
@@ -1061,9 +1030,8 @@ job.state      # e.g., "completed", "failed", "active", "queued"
 job.exit_code  # integer exit code
 job.id         # PBS job ID
 
-# Read a file
-task = home.fs.view("/home/parton/some/file.txt")
-task.wait(timeout=60)
+# Read a file (0.6 public surface: fs.head() or fs.tail(); Task is synchronously resolved)
+task = home.fs.head(f"/home/{ALCF_USER}/some/file.txt")
 content = task.result.get('output', {}).get('content', '')
 ```
 
