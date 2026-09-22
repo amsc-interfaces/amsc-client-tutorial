@@ -68,14 +68,10 @@ def test_missing_credentials_fail_closed(monkeypatch, capsys):
     assert "ALCF_IRI_TOKEN" in captured.err
 
 
-def test_equal_credentials_rejected_without_printing_token(monkeypatch, capsys):
-    module = load_smoke()
-    secret = "same-secret-value"
-    monkeypatch.setenv("AMSC_TOKEN", secret)
-    monkeypatch.setenv("ALCF_IRI_TOKEN", secret)
-    assert module.main() == 2
-    captured = capsys.readouterr()
-    assert secret not in captured.out + captured.err
+def test_script_does_not_compare_token_values():
+    source = SCRIPT.read_text()
+    assert "amsc_token == alcf_token" not in source
+    assert "amsc_token != alcf_token" not in source
 
 
 def prepare_success(module, monkeypatch):

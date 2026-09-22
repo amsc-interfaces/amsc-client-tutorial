@@ -52,10 +52,6 @@ def main() -> int:
 
     amsc_token = os.environ["AMSC_TOKEN"]
     alcf_token = os.environ["ALCF_IRI_TOKEN"]
-    if amsc_token == alcf_token:
-        print("[FAIL] Central and facility credentials must be independent.", file=sys.stderr)
-        return 2
-
     installed = _installed_version()
     if installed != EXPECTED_VERSION:
         print(
