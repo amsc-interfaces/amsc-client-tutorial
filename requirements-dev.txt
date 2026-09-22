@@ -1,0 +1,5 @@
+# Development dependencies for static validation and testing
+-r requirements.txt
+
+pytest>=8.0
+nbformat>=5.9

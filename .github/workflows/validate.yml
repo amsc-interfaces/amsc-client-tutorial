@@ -1,0 +1,61 @@
+name: Validate Tutorial
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  validate:
+    name: Static validation (Python 3.11)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        env:
+          # GitLab PyPI registries are public for read access; no token needed for the
+          # static-only checks (nbformat/pytest), but the package index headers are still
+          # required so pip can locate amsc-client==0.6.0 when credentials ARE supplied.
+          # In untrusted PR CI we install only the dev tooling; live checks are opt-in.
+          PIP_EXTRA_INDEX_URL: >-
+            https://gitlab.com/api/v4/projects/77567162/packages/pypi/simple
+            https://gitlab.com/api/v4/projects/76368190/packages/pypi/simple
+            https://gitlab.com/api/v4/projects/80654726/packages/pypi/simple
+        run: |
+          python -m pip install --upgrade pip
+          # Install dev tools unconditionally; amsc-client requires GitLab auth —
+          # install it only when the registry token secret is available.
+          pip install pytest nbformat
+
+          # Install amsc-client==0.6.0 only when the GitLab token is available.
+          # On untrusted PRs the secret is absent; structural checks still run.
+          if [ -n "${{ secrets.GITLAB_REGISTRY_TOKEN }}" ]; then
+            pip install \
+              --extra-index-url "https://gitlab-ci-token:${{ secrets.GITLAB_REGISTRY_TOKEN }}@gitlab.com/api/v4/projects/77567162/packages/pypi/simple" \
+              --extra-index-url "https://gitlab-ci-token:${{ secrets.GITLAB_REGISTRY_TOKEN }}@gitlab.com/api/v4/projects/76368190/packages/pypi/simple" \
+              --extra-index-url "https://gitlab-ci-token:${{ secrets.GITLAB_REGISTRY_TOKEN }}@gitlab.com/api/v4/projects/80654726/packages/pypi/simple" \
+              "amsc-client==0.6.0"
+            echo "AMSC_CLIENT_INSTALLED=true" >> "$GITHUB_ENV"
+          else
+            echo "AMSC_CLIENT_INSTALLED=false" >> "$GITHUB_ENV"
+            echo "::warning::GITLAB_REGISTRY_TOKEN secret not set; skipping amsc-client==0.6.0 install"
+          fi
+
+      - name: Run static validation suite
+        run: |
+          pytest tests/ -v --tb=short \
+            --ignore=tests/test_smoke_script.py
+
+      - name: Verify no embedded credentials
+        run: |
+          pytest tests/test_tutorial_content.py::TestNoEmbeddedCredentials -v --tb=short
