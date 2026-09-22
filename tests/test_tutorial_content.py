@@ -14,6 +14,8 @@ Run with:
 from __future__ import annotations
 
 import ast
+import importlib.metadata
+import inspect
 import json
 import os
 import re
@@ -57,6 +59,50 @@ def compile_cell(src: str, cell_idx: int) -> None:
         pytest.fail(f"Cell {cell_idx}: syntax error — {exc}\n\nSource:\n{src[:400]}")
 
 
+def dotted_name(node: ast.AST) -> str:
+    """Return a dotted name for a Name/Attribute expression."""
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        prefix = dotted_name(node.value)
+        return f"{prefix}.{node.attr}" if prefix else node.attr
+    return ""
+
+
+def assert_calls_are_guarded(nb: dict, suffixes: tuple[str, ...], gate: str) -> None:
+    """Require each matching call to be lexically nested under ``if <gate>``."""
+    for cell_index, source in enumerate(code_cells(nb)):
+        tree = ast.parse(source)
+
+        def visit(node: ast.AST, guarded: bool = False) -> None:
+            if isinstance(node, ast.If):
+                names = {n.id for n in ast.walk(node.test) if isinstance(n, ast.Name)}
+                for child in node.body:
+                    visit(child, guarded or gate in names)
+                for child in node.orelse:
+                    # ``if not ENABLE_WRITES: ... else: mutate()`` is the
+                    # repository's fail-closed guard idiom.
+                    negated_gate = (
+                        isinstance(node.test, ast.UnaryOp)
+                        and isinstance(node.test.op, ast.Not)
+                        and isinstance(node.test.operand, ast.Name)
+                        and node.test.operand.id == gate
+                    )
+                    visit(child, guarded or negated_gate)
+                return
+            if isinstance(node, ast.Call):
+                name = dotted_name(node.func)
+                if name.endswith(suffixes):
+                    assert guarded, (
+                        f"cell {cell_index}: mutating call {name} must be nested under "
+                        f"a default-off {gate} guard"
+                    )
+            for child in ast.iter_child_nodes(node):
+                visit(child, guarded)
+
+        visit(tree)
+
+
 # ============================================================================
 # Task 1 — Dependency pin and structural requirements
 # ============================================================================
@@ -92,6 +138,23 @@ class TestDependencyPin:
     def test_registry_amsc_auth_or_third(self):
         req = (REPO / "requirements.txt").read_text()
         assert "80654726" in req, "Missing third GitLab registry URL"
+
+    def test_registry_amsc_auth(self):
+        req = (REPO / "requirements.txt").read_text()
+        assert "82001936" in req, "Missing amsc-auth GitLab registry URL"
+
+    def test_installed_wheel_is_exact_release(self):
+        assert importlib.metadata.version("amsc-client") == "0.6.0"
+
+    def test_referenced_public_api_signatures(self):
+        from amsc_client.catalog.client import CatalogClient
+        from amscrot.facility.filesystem import FilesystemClient
+
+        artifact = inspect.signature(CatalogClient.create_artifact)
+        assert "catalog" in artifact.parameters
+        assert artifact.parameters["catalog"].default is inspect.Parameter.empty
+        for method in ("ls", "head", "mkdir", "rm", "upload", "download"):
+            assert callable(getattr(FilesystemClient, method))
 
     def test_requirements_dev_exists(self):
         assert (REPO / "requirements-dev.txt").exists(), (
@@ -167,7 +230,9 @@ class TestReadmeLinks:
     def test_no_stale_facility_tutorial_link(self):
         """The old monolithic facility_tutorial.ipynb was split; README must not link it."""
         readme = (REPO / "README.md").read_text()
-        assert "facility_tutorial.ipynb" not in readme, (
+        # Check for the exact markdown link target, not the substring —
+        # alcf_facility_tutorial.ipynb and nersc_facility_tutorial.ipynb are valid targets.
+        assert "](notebooks/facility_tutorial.ipynb)" not in readme, (
             "README still links the removed facility_tutorial.ipynb — "
             "update to alcf_facility_tutorial.ipynb and nersc_facility_tutorial.ipynb"
         )
@@ -310,6 +375,27 @@ class TestCatalogTutorial:
             "catalog_tutorial must store created FQNs for deterministic cleanup"
         )
 
+    def test_create_artifact_passes_catalog(self, nb):
+        calls = [
+            node
+            for src in code_cells(nb)
+            for node in ast.walk(ast.parse(src))
+            if isinstance(node, ast.Call)
+            and dotted_name(node.func).endswith("catalog.create_artifact")
+        ]
+        assert calls, "catalog tutorial must demonstrate create_artifact"
+        for call in calls:
+            assert "catalog" in {kw.arg for kw in call.keywords}, (
+                "create_artifact requires catalog= in amsc-client 0.6.0"
+            )
+
+    def test_catalog_mutations_are_structurally_guarded(self, nb):
+        assert_calls_are_guarded(
+            nb,
+            ("catalog.create_work", "catalog.create_artifact", "catalog.delete"),
+            "ENABLE_WRITES",
+        )
+
     def test_uses_run_id_for_uniqueness(self, code):
         assert "RUN_ID" in code, (
             "catalog_tutorial must use a per-run suffix (RUN_ID) to avoid collisions"
@@ -366,6 +452,9 @@ class TestAlcfFacilityTutorial:
             "alcf_facility_tutorial must make job submission explicitly opt-in"
         )
 
+    def test_submission_is_structurally_guarded(self, nb):
+        assert_calls_are_guarded(nb, (".submit",), "SUBMIT_JOB")
+
     def test_auth_domain_explained(self, code):
         """Notebook must explain the ALCF auth is independent from the central Keycard."""
         assert "ALCF" in code, "Facility auth domain explanation missing"
@@ -418,6 +507,9 @@ class TestNerscFacilityTutorial:
 
     def test_submission_is_opt_in(self, code):
         assert "SUBMIT_JOB" in code or "ENABLE_SUBMIT" in code or "# Submit" in code
+
+    def test_submission_is_structurally_guarded(self, nb):
+        assert_calls_are_guarded(nb, (".submit",), "SUBMIT_JOB")
 
     def test_no_custom_nersc_import_facility_config(self, code):
         """FacilityConfig should not be imported for the built-in NERSC path."""
@@ -474,6 +566,26 @@ class TestFilesystemTutorial:
             "filesystem_tutorial calls task.cancel() — not in the 0.6.0 public surface"
         )
 
+    def test_no_filesystem_task_polling(self, code):
+        for stale in ("task.wait(", "task.status", "task.id", "task.uri", "task.command"):
+            assert stale not in code, f"filesystem tutorial teaches stale Task API: {stale}"
+
+    def test_filesystem_mutations_are_structurally_guarded(self, nb):
+        assert_calls_are_guarded(
+            nb,
+            (
+                "fs.mkdir",
+                "fs.rm",
+                "fs.cp",
+                "fs.mv",
+                "fs.upload",
+                "fs.chmod",
+                "fs.compress",
+                "fs.extract",
+            ),
+            "ENABLE_WRITES",
+        )
+
     def test_tutorial_dir_uses_run_id(self, code):
         """Destructive ops must use a per-run uniquely named directory."""
         assert "RUN_ID" in code or "run_id" in code, (
@@ -525,6 +637,15 @@ class TestReadmeContent:
         assert "staging.american-science-cloud.org" in readme, (
             "README must reference the staging endpoint"
         )
+
+    def test_python_floor_matches_published_wheel(self, readme):
+        assert "Python 3.11+" in readme
+        assert "Python 3.10+" not in readme
+
+    def test_read_only_mixed_auth_smoke_documented(self, readme):
+        assert "scripts/smoke_mixed_auth.py" in readme
+        assert "ALCF_IRI_TOKEN" in readme
+        assert "read-only" in readme.lower()
 
     def test_tutorial_order_is_sane(self, readme):
         """All 5 notebooks must be listed."""
@@ -594,6 +715,10 @@ class TestAgenticGuide:
                 "The public upload path is preferred."
             )
 
+    def test_does_not_claim_direct_upload_is_unavailable(self, guide):
+        assert "can't upload files directly" not in guide
+        assert "adds direct file-upload support in a future version" not in guide
+
 
 class TestPytorchGuide:
     """docs/pytorch-distributed-training-on-polaris.md — 0.6.0 auth, parameterised values."""
@@ -647,13 +772,25 @@ class TestGithubActions:
 
     def test_workflow_installs_amsc_client_0_6(self):
         content = self.GHA_PATH.read_text()
-        assert "amsc-client==0.6.0" in content, (
-            "GitHub Actions workflow must install amsc-client==0.6.0"
-        )
+        assert "pip install -r requirements-dev.txt" in content
+        assert "amsc-client==0.6.0" in (REPO / "requirements.txt").read_text()
 
     def test_workflow_runs_pytest(self):
         content = self.GHA_PATH.read_text()
         assert "pytest" in content, "GitHub Actions workflow must run pytest"
+
+    def test_workflow_runs_smoke_unit_tests(self):
+        content = self.GHA_PATH.read_text()
+        assert "--ignore=tests/test_smoke_script.py" not in content
+
+    def test_workflow_installs_declared_dev_requirements(self):
+        content = self.GHA_PATH.read_text()
+        assert "requirements-dev.txt" in content
+
+    def test_workflow_contains_all_package_indexes(self):
+        content = (REPO / "requirements.txt").read_text()
+        for project_id in ("77567162", "76368190", "80654726", "82001936"):
+            assert project_id in content
 
     def test_workflow_uses_python_311(self):
         content = self.GHA_PATH.read_text()
