@@ -459,6 +459,11 @@ class TestAlcfFacilityTutorial:
     def test_submission_is_structurally_guarded(self, nb):
         assert_calls_are_guarded(nb, (".submit",), "SUBMIT_JOB")
 
+    def test_submission_uses_existing_home_directory(self, code):
+        """The tutorial must not assume that an output subdirectory already exists."""
+        assert 'OUTPUT_DIR = f"/home/{ALCF_USERNAME}"' in code
+        assert "iri_job_outputs" not in code
+
     def test_submission_passes_required_output_paths(self, nb):
         """ALCF IRI rejects job submissions without explicit stdout/stderr paths."""
         submit_calls = []
