@@ -749,15 +749,32 @@ class TestNotebookAuthenticationGuidance:
             "".join(cell["source"])
             for cell in nb["cells"]
         )
-        for misleading_phrase in (
-            "browser window",
-            "browser prompt",
-            "opens a browser",
-            "browser opens",
-        ):
-            assert misleading_phrase not in source
+        normalized = " ".join(source.split()).lower()
+        for misleading_phrase in ("browser window", "browser prompt", "opens a browser", "browser opens"):
+            assert misleading_phrase not in normalized
         assert "authorization URL" in source
         assert "authorization code" in source
+
+    def test_alcf_notebook_documents_login_and_renewal(self):
+        nb = load_notebook("alcf_facility_tutorial.ipynb")
+        markdown = "\n".join(
+            "".join(cell["source"])
+            for cell in nb["cells"]
+            if cell["cell_type"] == "markdown"
+        )
+        for phrase in (
+            "## Authenticate with ALCF Globus",
+            "first protected ALCF call",
+            "authorization URL",
+            "authorization code",
+            "cached in `~/.amsc/credentials.json`",
+            "refresh token",
+            "restart the notebook kernel",
+            "rm ~/.amsc/credentials.json",
+            "high-assurance timeout",
+            "alcf.anl.gov",
+        ):
+            assert phrase in markdown, f"ALCF notebook missing auth instructions: {phrase!r}"
 
 class TestAgenticGuide:
     """docs/agentic-guide-to-polaris-with-iri.md — 0.6.0 auth, labeled claims."""
