@@ -37,7 +37,7 @@ export AMSC_TOKEN='<your-amsc-keycard>'
 
 The AmSC staging API endpoint is `https://api.staging.american-science-cloud.org/api/current`.
 
-Facility tutorials (ALCF, NERSC, filesystem) use independent facility-native Globus authenticators. `client.facility("alcf")` and `client.facility("nersc")` do not reuse `AMSC_TOKEN`; the first protected facility call prints an authorization URL. Open it, log in with the appropriate facility identity, then paste the returned authorization code into the prompt.
+Facility tutorials (ALCF, NERSC, filesystem) use independent facility-native Globus authenticators. `client.facility("alcf")` and `client.facility("nersc")` do not reuse `AMSC_TOKEN`. When a protected facility call needs a credential and no usable cached credential exists, the client prints an authorization URL. Open it, log in with the appropriate facility identity, then paste the returned authorization code into the prompt.
 
 **Credential safety:** Never paste a token into a notebook cell, save it in notebook output, commit it, or print it. Export credentials in the shell before starting Jupyter. If a token is exposed, revoke or rotate it and clear the notebook output. The AmSC Passport/ID token is not an API bearer; central API calls require the AmSC Keycard access token.
 
