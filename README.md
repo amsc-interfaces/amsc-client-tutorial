@@ -37,7 +37,9 @@ export AMSC_TOKEN='<your-amsc-keycard>'
 
 The AmSC staging API endpoint is `https://api.staging.american-science-cloud.org/api/current`.
 
-Facility tutorials (ALCF, NERSC, filesystem) use independent Globus-based authenticators. The Globus login is triggered automatically on the first facility call — a browser window will open.
+Facility tutorials (ALCF, NERSC, filesystem) use independent facility-native Globus authenticators. `client.facility("alcf")` and `client.facility("nersc")` do not reuse `AMSC_TOKEN`. When a protected facility call needs a credential and no usable cached credential exists, the client prints an authorization URL. Open it, log in with the appropriate facility identity, then paste the returned authorization code into the prompt.
+
+**Credential safety:** Never paste a token into a notebook cell, save it in notebook output, commit it, or print it. Export credentials in the shell before starting Jupyter. If a token is exposed, revoke or rotate it and clear the notebook output. The AmSC Passport/ID token is not an API bearer; central API calls require the AmSC Keycard access token.
 
 ### 5. Launch Jupyter
 
@@ -79,6 +81,23 @@ Facility-native Globus authenticator (ALCF or NERSC)
 
 **Important:** `AMSC_TOKEN` must be an AmSC access token (Keycard), not an OIDC ID token (Passport). Never print or embed tokens in notebooks.
 
+### Authentication quick reference
+
+- **Catalog notebooks:** export `AMSC_TOKEN` before starting Jupyter. These calls target the AmSC staging API.
+- **ALCF and filesystem notebooks:** no `AMSC_TOKEN` is needed for facility-only access. The built-in ALCF authenticator starts an ALCF Globus login when a protected IRI v1 call first needs a token.
+- **NERSC notebook:** no `AMSC_TOKEN` is needed for facility-only access. The built-in NERSC authenticator uses a separate NERSC Globus login.
+- **Stale facility login:** restart the kernel and reauthenticate. If necessary, remove `~/.amsc/credentials.json` to force a fresh login. Never copy credentials from that file into a notebook.
+- **Write safety:** leave `ENABLE_WRITES=False` and `SUBMIT_JOB=False` until the required account, allocation, API access, destination paths, and project values have been confirmed.
+
+### Validation status
+
+Validation claims are scoped and dated; they do not imply that every example or write path has run at every facility.
+
+- **AmSC staging — Live-validated 2026-09-22:** the AmSC Keycard authenticated a protected central account read. Read-only catalog examples are also covered by the static suite; catalog writes still require the user's authorized staging catalog.
+- **ALCF direct IRI v1 — Live-validated 2026-09-22:** an independent facility-native Globus token authenticated a protected account-project read through the same `Client`. Public facility discovery does not prove authentication. Job submission and filesystem mutations remain explicit opt-in operations.
+- **NERSC — Not yet live-validated by the tutorial maintainers:** NERSC is built into `amsc-client 0.6.0`, and the notebook is statically checked against the published API, but its login, protected reads, filesystem access, and submission flow still require live validation.
+- **OLCF — Not currently covered:** No built-in `amsc-client 0.6.0` facility configuration exists, and this repository has no OLCF tutorial. Do not adapt the NERSC or ALCF examples by changing only the facility name.
+
 ### Verify both authentication domains
 
 After obtaining both credentials, run the opt-in, read-only mixed-auth smoke test:
@@ -93,7 +112,7 @@ It uses one `Client`, but keeps the central Keycard and facility-native ALCF
 credential independent. It proves each credential against a protected account
 read and performs no job submissions, catalog writes, or filesystem mutations.
 
-## Supported Facilities
+## Client-integrated facilities
 
 Both ALCF and NERSC are **built-in** facilities — no manual registration required:
 
@@ -105,6 +124,8 @@ client = Client()  # No token needed for facility-only access
 alcf  = client.facility("alcf")
 nersc = client.facility("nersc")
 ```
+
+OLCF is not listed because `amsc-client 0.6.0` does not provide a built-in OLCF facility configuration and this repository has no OLCF tutorial.
 
 ### ALCF (Argonne Leadership Computing Facility)
 
