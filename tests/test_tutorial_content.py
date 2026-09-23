@@ -671,6 +671,11 @@ class TestReadmeContent:
         assert "Passport/ID token" in readme
         assert "facility-native Globus" in readme
 
+    def test_globus_login_flow_is_described_accurately(self, readme):
+        assert "authorization URL" in readme
+        assert "authorization code" in readme
+        assert "browser window will open" not in readme
+
     def test_tutorial_order_is_sane(self, readme):
         """All 5 notebooks must be listed."""
         for nb in [
@@ -729,6 +734,21 @@ class TestNotebookAuthenticationGuidance:
         )
         for phrase in phrases:
             assert phrase in markdown, f"{name}: missing authentication guidance {phrase!r}"
+
+    @pytest.mark.parametrize(
+        "name", ["alcf_facility_tutorial.ipynb", "nersc_facility_tutorial.ipynb"]
+    )
+    def test_facility_login_does_not_claim_browser_auto_opens(self, name):
+        nb = load_notebook(name)
+        markdown = "\n".join(
+            "".join(cell["source"])
+            for cell in nb["cells"]
+            if cell["cell_type"] == "markdown"
+        )
+        assert "browser window will open" not in markdown
+        assert "opens a browser" not in markdown
+        assert "authorization URL" in markdown
+        assert "authorization code" in markdown
 
 class TestAgenticGuide:
     """docs/agentic-guide-to-polaris-with-iri.md — 0.6.0 auth, labeled claims."""
