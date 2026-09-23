@@ -536,6 +536,35 @@ class TestNerscFacilityTutorial:
     def test_submission_is_structurally_guarded(self, nb):
         assert_calls_are_guarded(nb, (".submit",), "SUBMIT_JOB")
 
+    def test_submission_passes_required_output_paths(self, nb):
+        submit_calls = []
+        for source in code_cells(nb):
+            tree = ast.parse(source)
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "submit":
+                    submit_calls.append(node)
+
+        assert submit_calls, "NERSC tutorial must contain at least one submit() call"
+        for call in submit_calls:
+            keyword_names = {keyword.arg for keyword in call.keywords}
+            assert {"stdout_path", "stderr_path"} <= keyword_names, (
+                "Every NERSC submit() call must pass stdout_path and stderr_path"
+            )
+
+    def test_submission_uses_existing_home_directory(self, code):
+        assert 'OUTPUT_DIR = "/global/homes/" + NERSC_USERNAME[0] + "/" + NERSC_USERNAME' in code
+        assert "iri_job_outputs" not in code
+
+    def test_documents_empty_authentication_session_recovery(self, nb):
+        text = "\n".join(
+            "".join(cell["source"])
+            for cell in nb["cells"]
+            if cell["cell_type"] == "markdown"
+        )
+        assert "session_info.authentications: {}`" in text
+        assert "private/incognito window" in text
+        assert "does not force `prompt=login`" in text
+
     def test_no_custom_nersc_import_facility_config(self, code):
         """FacilityConfig should not be imported for the built-in NERSC path."""
         assert "FacilityConfig" not in code, (
