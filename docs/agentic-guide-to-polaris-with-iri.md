@@ -50,7 +50,7 @@ The IRI API has significant constraints that require specific workarounds. This 
 
 - **ALCF user:** `$ALCF_USERNAME` (replace with your username), **project:** `$ALCF_ACCOUNT`
 - **Container registry:** Docker Hub (`$CONTAINER_IMAGE` — replace with your image)
-- **amsc-client version:** 0.6.0 *(observations from the configuration above; verify against current ALCF documentation)*
+- **amsc-client version:** 0.6.1 *(observations from the configuration above; verify against current ALCF documentation)*
 - **Polaris nodes:** NVIDIA A100 GPUs (Ampere80), Cray Slingshot network, PBS scheduler
 - **Apptainer version on Polaris:** 1.4.1
 
@@ -67,7 +67,7 @@ The IRI API has significant constraints that require specific workarounds. This 
 amsc-client is distributed via a private GitLab package registry. Three extra index URLs are required:
 
 ```bash
-pip install amsc-client==0.6.0 \
+pip install amsc-client==0.6.1 \
   --extra-index-url https://gitlab.com/api/v4/projects/... \
   --extra-index-url https://... \
   --extra-index-url https://...
@@ -83,7 +83,7 @@ Auth uses cached Globus credentials. The client reads from `~/.amsc/credentials.
 ```python
 from amsc_client import Client
 
-# amsc-client 0.6.0 — ALCF facility access (no central-service token required)
+# amsc-client 0.6.1 — ALCF facility access (no central-service token required)
 # The ALCF Globus authenticator is resolved automatically on the first facility call.
 client = Client()
 ```
@@ -331,7 +331,7 @@ ALCF_USER = os.environ.get("ALCF_USERNAME", "your-alcf-username")  # set ALCF_US
 PROJECT   = os.environ.get("ALCF_ACCOUNT", "your-allocation")      # set ALCF_ACCOUNT
 WORK_DIR  = f"/home/{ALCF_USER}/my-iri-job"
 
-# amsc-client 0.6.0 — ALCF facility access (Globus auth is resolved automatically)
+# amsc-client 0.6.1 — ALCF facility access (Globus auth is resolved automatically)
 client = Client()
 
 alcf    = client.facility("alcf")
@@ -849,7 +849,7 @@ ALCF_USER = os.environ.get("ALCF_USERNAME", "your-alcf-username")  # set ALCF_US
 PROJECT   = os.environ.get("ALCF_ACCOUNT", "your-allocation")      # set ALCF_ACCOUNT
 WORK_DIR  = f"/home/{ALCF_USER}/pepper-iri-test"
 
-# amsc-client 0.6.0 — ALCF facility access (Globus auth resolved automatically)
+# amsc-client 0.6.1 — ALCF facility access (Globus auth resolved automatically)
 client = Client()
 
 alcf    = client.facility("alcf")

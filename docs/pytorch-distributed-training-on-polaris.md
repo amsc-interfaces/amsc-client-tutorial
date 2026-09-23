@@ -488,7 +488,7 @@ import base64
 import os
 import time
 
-# ─── Authenticate (amsc-client 0.6.0 — ALCF Globus auth resolved automatically) ──
+# ─── Authenticate (amsc-client 0.6.1 — ALCF Globus auth resolved automatically) ──
 # Set ALCF_USERNAME and ALCF_ACCOUNT as environment variables.
 ALCF_USER = os.environ.get("ALCF_USERNAME", "your-alcf-username")
 PROJECT   = os.environ.get("ALCF_ACCOUNT",  "your-allocation")

@@ -80,7 +80,7 @@ def prepare_success(module, monkeypatch):
     monkeypatch.setattr(module, "Client", FakeClient)
     monkeypatch.setattr(module, "TokenAuthenticator", FakeAuthenticator)
     monkeypatch.setattr(module, "probe_openapi", lambda url: None)
-    monkeypatch.setattr(module, "_installed_version", lambda: "0.6.0")
+    monkeypatch.setattr(module, "_installed_version", lambda: "0.6.1")
 
 
 def test_success_uses_one_client_and_two_auth_domains(monkeypatch, capsys):

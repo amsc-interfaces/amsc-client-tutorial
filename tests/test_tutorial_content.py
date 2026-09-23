@@ -109,15 +109,15 @@ def assert_calls_are_guarded(nb: dict, suffixes: tuple[str, ...], gate: str) -> 
 
 
 class TestDependencyPin:
-    """requirements.txt must pin amsc-client==0.6.0 and list all required registries."""
+    """requirements.txt must pin amsc-client==0.6.1 and list all required registries."""
 
     def test_requirements_txt_exists(self):
         assert (REPO / "requirements.txt").exists()
 
     def test_amsc_client_exact_pin(self):
         req = (REPO / "requirements.txt").read_text()
-        assert "amsc-client==0.6.0" in req, (
-            "requirements.txt must pin amsc-client==0.6.0 (exact), "
+        assert "amsc-client==0.6.1" in req, (
+            "requirements.txt must pin amsc-client==0.6.1 (exact), "
             "not a range like <0.5 or >=0.4"
         )
 
@@ -144,7 +144,7 @@ class TestDependencyPin:
         assert "82001936" in req, "Missing amsc-auth GitLab registry URL"
 
     def test_installed_wheel_is_exact_release(self):
-        assert importlib.metadata.version("amsc-client") == "0.6.0"
+        assert importlib.metadata.version("amsc-client") == "0.6.1"
 
     def test_referenced_public_api_signatures(self):
         from amsc_client.catalog.client import CatalogClient
@@ -386,7 +386,7 @@ class TestCatalogTutorial:
         assert calls, "catalog tutorial must demonstrate create_artifact"
         for call in calls:
             assert "catalog" in {kw.arg for kw in call.keywords}, (
-                "create_artifact requires catalog= in amsc-client 0.6.0"
+                "create_artifact requires catalog= in amsc-client 0.6.1"
             )
 
     def test_catalog_mutations_are_structurally_guarded(self, nb):
@@ -563,7 +563,8 @@ class TestNerscFacilityTutorial:
         )
         assert "session_info.authentications: {}`" in text
         assert "private/incognito window" in text
-        assert "does not force `prompt=login`" in text
+        assert "uses `prompt=login`" in text
+        assert "does not force `prompt=login`" not in text
 
     def test_no_custom_nersc_import_facility_config(self, code):
         """FacilityConfig should not be imported for the built-in NERSC path."""
@@ -574,7 +575,7 @@ class TestNerscFacilityTutorial:
 
 
 class TestFilesystemTutorial:
-    """filesystem_tutorial.ipynb — 0.6.0 public surface only; no view/file/live polling."""
+    """filesystem_tutorial.ipynb — 0.6.1 public surface only; no view/file/live polling."""
 
     @pytest.fixture
     def nb(self):
@@ -590,12 +591,12 @@ class TestFilesystemTutorial:
 
     def test_no_view_method(self, code):
         assert "fs.view(" not in code, (
-            "filesystem_tutorial calls fs.view() which is not in the 0.6.0 public surface"
+            "filesystem_tutorial calls fs.view() which is not in the 0.6.1 public surface"
         )
 
     def test_no_file_method(self, code):
         assert "fs.file(" not in code, (
-            "filesystem_tutorial calls fs.file() which is not in the 0.6.0 public surface"
+            "filesystem_tutorial calls fs.file() which is not in the 0.6.1 public surface"
         )
 
     def test_no_hardcoded_username(self, code):
@@ -617,7 +618,7 @@ class TestFilesystemTutorial:
         # Either wait() is used (no-op but harmless) or the text explains the compatibility note
         # We just check that the notebook doesn't claim wait() polls live state
         assert "task.cancel" not in code, (
-            "filesystem_tutorial calls task.cancel() — not in the 0.6.0 public surface"
+            "filesystem_tutorial calls task.cancel() — not in the 0.6.1 public surface"
         )
 
     def test_no_filesystem_task_polling(self, code):
@@ -659,15 +660,15 @@ class TestFilesystemTutorial:
 
 
 class TestReadmeContent:
-    """README.md must reflect 0.6.0 setup, correct auth, and current notebook inventory."""
+    """README.md must reflect 0.6.1 setup, correct auth, and current notebook inventory."""
 
     @pytest.fixture
     def readme(self):
         return (REPO / "README.md").read_text()
 
     def test_installation_shows_exact_pin(self, readme):
-        assert "amsc-client==0.6.0" in readme, (
-            "README installation section must show amsc-client==0.6.0"
+        assert "amsc-client==0.6.1" in readme, (
+            "README installation section must show amsc-client==0.6.1"
         )
 
     def test_no_old_globus_central_auth_example(self, readme):
@@ -713,7 +714,7 @@ class TestReadmeContent:
 
     def test_olcf_is_not_claimed_as_supported(self, readme):
         assert "OLCF" in readme
-        assert "No built-in `amsc-client 0.6.0` facility configuration" in readme
+        assert "No built-in `amsc-client 0.6.1` facility configuration" in readme
         assert "no OLCF tutorial" in readme
 
     def test_authentication_safety_guidance(self, readme):
@@ -827,7 +828,7 @@ class TestNotebookAuthenticationGuidance:
             assert phrase in markdown, f"ALCF notebook missing auth instructions: {phrase!r}"
 
 class TestAgenticGuide:
-    """docs/agentic-guide-to-polaris-with-iri.md — 0.6.0 auth, labeled claims."""
+    """docs/agentic-guide-to-polaris-with-iri.md — 0.6.1 auth, labeled claims."""
 
     @pytest.fixture
     def guide(self):
@@ -888,7 +889,7 @@ class TestAgenticGuide:
 
 
 class TestPytorchGuide:
-    """docs/pytorch-distributed-training-on-polaris.md — 0.6.0 auth, parameterised values."""
+    """docs/pytorch-distributed-training-on-polaris.md — 0.6.1 auth, parameterised values."""
 
     @pytest.fixture
     def guide(self):
@@ -940,7 +941,7 @@ class TestGithubActions:
     def test_workflow_installs_amsc_client_0_6(self):
         content = self.GHA_PATH.read_text()
         assert "pip install -r requirements-dev.txt" in content
-        assert "amsc-client==0.6.0" in (REPO / "requirements.txt").read_text()
+        assert "amsc-client==0.6.1" in (REPO / "requirements.txt").read_text()
 
     def test_workflow_runs_pytest(self):
         content = self.GHA_PATH.read_text()
