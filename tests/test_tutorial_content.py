@@ -651,6 +651,26 @@ class TestReadmeContent:
         assert "ALCF_IRI_TOKEN" in readme
         assert "read-only" in readme.lower()
 
+    def test_live_validation_status_is_dated_and_scoped(self, readme):
+        assert "2026-09-22" in readme
+        assert "AmSC staging" in readme and "Live-validated" in readme
+        assert "ALCF direct IRI v1" in readme and "protected account" in readme
+        assert "Public facility discovery does not prove authentication" in readme
+
+    def test_nersc_is_not_claimed_as_live_validated(self, readme):
+        assert "NERSC" in readme
+        assert "Not yet live-validated by the tutorial maintainers" in readme
+
+    def test_olcf_is_not_claimed_as_supported(self, readme):
+        assert "OLCF" in readme
+        assert "No built-in `amsc-client 0.6.0` facility configuration" in readme
+        assert "no OLCF tutorial" in readme
+
+    def test_authentication_safety_guidance(self, readme):
+        assert "Never paste a token into a notebook cell" in readme
+        assert "Passport/ID token" in readme
+        assert "facility-native Globus" in readme
+
     def test_tutorial_order_is_sane(self, readme):
         """All 5 notebooks must be listed."""
         for nb in [
@@ -662,6 +682,53 @@ class TestReadmeContent:
         ]:
             assert nb in readme, f"README does not mention {nb}"
 
+
+class TestNotebookAuthenticationGuidance:
+    """Every notebook must identify its credential domain and validation scope."""
+
+    EXPECTED = {
+        "catalog_explorer.ipynb": (
+            "Authentication and validation status",
+            "AMSC_TOKEN",
+            "live-validated",
+            "read-only",
+        ),
+        "catalog_tutorial.ipynb": (
+            "Authentication and validation status",
+            "AMSC_TOKEN",
+            "ENABLE_WRITES=False",
+            "write access",
+        ),
+        "alcf_facility_tutorial.ipynb": (
+            "Authentication and validation status",
+            "facility-native Globus",
+            "live-validated",
+            "SUBMIT_JOB=False",
+        ),
+        "filesystem_tutorial.ipynb": (
+            "Authentication and validation status",
+            "facility-native Globus",
+            "ENABLE_WRITES=False",
+            "run-unique",
+        ),
+        "nersc_facility_tutorial.ipynb": (
+            "Authentication and validation status",
+            "facility-native Globus",
+            "not yet been live-validated",
+            "SUBMIT_JOB=False",
+        ),
+    }
+
+    @pytest.mark.parametrize("name,phrases", EXPECTED.items())
+    def test_notebook_banner(self, name, phrases):
+        nb = load_notebook(name)
+        markdown = "\n".join(
+            "".join(cell["source"])
+            for cell in nb["cells"]
+            if cell["cell_type"] == "markdown"
+        )
+        for phrase in phrases:
+            assert phrase in markdown, f"{name}: missing authentication guidance {phrase!r}"
 
 class TestAgenticGuide:
     """docs/agentic-guide-to-polaris-with-iri.md — 0.6.0 auth, labeled claims."""
