@@ -736,19 +736,28 @@ class TestNotebookAuthenticationGuidance:
             assert phrase in markdown, f"{name}: missing authentication guidance {phrase!r}"
 
     @pytest.mark.parametrize(
-        "name", ["alcf_facility_tutorial.ipynb", "nersc_facility_tutorial.ipynb"]
+        "name",
+        [
+            "alcf_facility_tutorial.ipynb",
+            "filesystem_tutorial.ipynb",
+            "nersc_facility_tutorial.ipynb",
+        ],
     )
     def test_facility_login_does_not_claim_browser_auto_opens(self, name):
         nb = load_notebook(name)
-        markdown = "\n".join(
+        source = "\n".join(
             "".join(cell["source"])
             for cell in nb["cells"]
-            if cell["cell_type"] == "markdown"
         )
-        assert "browser window will open" not in markdown
-        assert "opens a browser" not in markdown
-        assert "authorization URL" in markdown
-        assert "authorization code" in markdown
+        for misleading_phrase in (
+            "browser window",
+            "browser prompt",
+            "opens a browser",
+            "browser opens",
+        ):
+            assert misleading_phrase not in source
+        assert "authorization URL" in source
+        assert "authorization code" in source
 
 class TestAgenticGuide:
     """docs/agentic-guide-to-polaris-with-iri.md — 0.6.0 auth, labeled claims."""
