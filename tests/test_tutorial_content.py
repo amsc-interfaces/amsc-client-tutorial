@@ -459,16 +459,37 @@ class TestAlcfFacilityTutorial:
     def test_submission_is_structurally_guarded(self, nb):
         assert_calls_are_guarded(nb, (".submit",), "SUBMIT_JOB")
 
+    def test_submission_uses_existing_home_directory(self, code):
+        """The tutorial must not assume that an output subdirectory already exists."""
+        assert 'OUTPUT_DIR = f"/home/{ALCF_USERNAME}"' in code
+        assert "iri_job_outputs" not in code
+
+    def test_submission_passes_required_output_paths(self, nb):
+        """ALCF IRI rejects job submissions without explicit stdout/stderr paths."""
+        submit_calls = []
+        for source in code_cells(nb):
+            tree = ast.parse(source)
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Call) and dotted_name(node.func).endswith(".submit"):
+                    submit_calls.append(node)
+
+        assert submit_calls, "alcf_facility_tutorial must contain a job submission"
+        for call in submit_calls:
+            keywords = {kw.arg for kw in call.keywords if kw.arg is not None}
+            assert {"stdout_path", "stderr_path"} <= keywords, (
+                "ALCF IRI job submission requires explicit stdout_path and stderr_path"
+            )
+
     def test_auth_domain_explained(self, code):
         """Notebook must explain the ALCF auth is independent from the central Keycard."""
         assert "ALCF" in code, "Facility auth domain explanation missing"
 
     def test_no_globus_client_registration(self, code):
-        """ALCF must not require manual register_facility — it's built-in."""
-        # If register_facility is called for alcf, that's wrong for the built-in
-        if "register_facility" in code and "alcf" in code:
-            # OK only if it's the NERSC notebook or an override
-            pass  # alcf notebook should use auto-registration via client.facility("alcf")
+        """ALCF must not require manual registration because it is built in."""
+        assert "register_facility" not in code, (
+            "alcf_facility_tutorial must use built-in client.facility('alcf') "
+            "rather than manual registration"
+        )
 
 
 class TestNerscFacilityTutorial:
