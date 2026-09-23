@@ -3,5 +3,5 @@
 --extra-index-url https://gitlab.com/api/v4/projects/80654726/packages/pypi/simple
 --extra-index-url https://gitlab.com/api/v4/projects/82001936/packages/pypi/simple
 
-amsc-client==0.6.0
+amsc-client==0.6.1
 jupyter

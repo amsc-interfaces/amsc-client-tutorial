@@ -1,6 +1,6 @@
 # AmSC Client Tutorials
 
-Tutorial notebooks for the [AmSC Python Client](https://gitlab.com/amsc2/infrastructure-and-services/amsc-interfaces/amsc-python-client) — a unified SDK for the American Science Cloud APIs, targeting `amsc-client==0.6.0`.
+Tutorial notebooks for the [AmSC Python Client](https://gitlab.com/amsc2/infrastructure-and-services/amsc-interfaces/amsc-python-client) — a unified SDK for the American Science Cloud APIs, targeting `amsc-client==0.6.1`.
 
 ## Getting Started
 
@@ -25,7 +25,7 @@ source venv/bin/activate    # Linux/macOS
 pip install -r requirements.txt
 ```
 
-This installs `amsc-client==0.6.0` and Jupyter from the four public AmSC GitLab package registries.
+This installs `amsc-client==0.6.1` and Jupyter from the four public AmSC GitLab package registries.
 
 ### 4. Set up authentication
 
@@ -95,8 +95,8 @@ Validation claims are scoped and dated; they do not imply that every example or 
 
 - **AmSC staging — Live-validated 2026-09-22:** the AmSC Keycard authenticated a protected central account read. Read-only catalog examples are also covered by the static suite; catalog writes still require the user's authorized staging catalog.
 - **ALCF direct IRI v1 — Live-validated 2026-09-22:** an independent facility-native Globus token authenticated a protected account-project read through the same `Client`. Public facility discovery does not prove authentication. Job submission and filesystem mutations remain explicit opt-in operations.
-- **NERSC — Not yet live-validated by the tutorial maintainers:** NERSC is built into `amsc-client 0.6.0`, and the notebook is statically checked against the published API, but its login, protected reads, filesystem access, and submission flow still require live validation.
-- **OLCF — Not currently covered:** No built-in `amsc-client 0.6.0` facility configuration exists, and this repository has no OLCF tutorial. Do not adapt the NERSC or ALCF examples by changing only the facility name.
+- **NERSC — Not yet live-validated by the tutorial maintainers:** NERSC is built into `amsc-client 0.6.1`, and the notebook is statically checked against the published API, but its login, protected reads, filesystem access, and submission flow still require live validation.
+- **OLCF — Not currently covered:** No built-in `amsc-client 0.6.1` facility configuration exists, and this repository has no OLCF tutorial. Do not adapt the NERSC or ALCF examples by changing only the facility name.
 
 ### Verify both authentication domains
 
@@ -125,7 +125,7 @@ alcf  = client.facility("alcf")
 nersc = client.facility("nersc")
 ```
 
-OLCF is not listed because `amsc-client 0.6.0` does not provide a built-in OLCF facility configuration and this repository has no OLCF tutorial.
+OLCF is not listed because `amsc-client 0.6.1` does not provide a built-in OLCF facility configuration and this repository has no OLCF tutorial.
 
 ### ALCF (Argonne Leadership Computing Facility)
 
@@ -159,7 +159,7 @@ if SUBMIT_JOB:
 
 ### NERSC (National Energy Research Scientific Computing Center)
 
-NERSC is a built-in facility in `amsc-client 0.6.0` — use `client.facility("nersc")` directly:
+NERSC is a built-in facility in `amsc-client 0.6.1` — use `client.facility("nersc")` directly:
 
 ```python
 nersc      = client.facility("nersc")
@@ -227,10 +227,10 @@ ALCF uses a high-assurance Globus auth policy — the login session carries a ti
 
 ### Package not found
 
-`amsc-client 0.6.0` is distributed across four public GitLab package registries. If `pip install -r requirements.txt` fails, try:
+`amsc-client 0.6.1` is distributed across four public GitLab package registries. If `pip install -r requirements.txt` fails, try:
 
 ```bash
-pip install amsc-client==0.6.0 \
+pip install amsc-client==0.6.1 \
   --extra-index-url https://gitlab.com/api/v4/projects/77567162/packages/pypi/simple \
   --extra-index-url https://gitlab.com/api/v4/projects/76368190/packages/pypi/simple \
   --extra-index-url https://gitlab.com/api/v4/projects/80654726/packages/pypi/simple \

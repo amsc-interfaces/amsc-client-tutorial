@@ -1,4 +1,4 @@
-"""Opt-in, read-only mixed-auth smoke test for ``amsc-client==0.6.0``.
+"""Opt-in, read-only mixed-auth smoke test for ``amsc-client==0.6.1``.
 
 The central AmSC staging API uses ``AMSC_TOKEN`` (an AmSC Keycard access
 token). The direct ALCF IRI v1 API uses the independent ``ALCF_IRI_TOKEN``.
@@ -18,7 +18,7 @@ from amsc_client.auth import TokenAuthenticator
 STAGING_BASE_URL = "https://api.staging.american-science-cloud.org/api/current"
 STAGING_OPENAPI_URL = f"{STAGING_BASE_URL}/openapi.json"
 ALCF_OPENAPI_URL = "https://api.alcf.anl.gov/openapi.json"
-EXPECTED_VERSION = "0.6.0"
+EXPECTED_VERSION = "0.6.1"
 _REQUIRED_VARS = ("AMSC_TOKEN", "ALCF_IRI_TOKEN")
 
 
@@ -26,7 +26,7 @@ def probe_openapi(url: str) -> None:
     """Require a reachable response that resembles an OpenAPI document."""
     request = urllib.request.Request(
         url,
-        headers={"Accept": "application/json", "User-Agent": "amsc-client-tutorial-smoke/0.6.0"},
+        headers={"Accept": "application/json", "User-Agent": "amsc-client-tutorial-smoke/0.6.1"},
     )
     with urllib.request.urlopen(request, timeout=15) as response:
         body = response.read(4096)
@@ -76,7 +76,7 @@ def main() -> int:
         print("[OK] staging protected account read authenticated")
 
         alcf = client.facility("alcf")
-        # amsc-client 0.6.0 has no public account/projects method on
+        # amsc-client 0.6.1 has no public account/projects method on
         # FacilityClient. This deliberately narrow diagnostic escape hatch is
         # required to prove the ALCF bearer against a protected IRI v1 route;
         # public resources() discovery is not authentication evidence.
