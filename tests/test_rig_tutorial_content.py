@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 from amsc_client import Client
+from amsc_client.core.exceptions import ApiError, AuthenticationError
 from amsc_client.facility.client import FacilityClient
 
 REPO = Path(__file__).parent.parent
@@ -120,7 +121,14 @@ def test_common_rig_auth_and_transport_contract(name):
     assert "AMSC_TOKEN" in source and ("os.environ" in source or "os.getenv" in source)
     assert "https://api.staging.american-science-cloud.org/api/current" in source
     assert "https://rig.staging.american-science-cloud.org" in source
-    assert re.search(r"Client\s*\(.*token\s*=.*base_url\s*=", source, re.S)
+    client_calls = [
+        node
+        for tree in trees
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and dotted_name(node.func) == "Client"
+    ]
+    assert len(client_calls) == 1
+    assert {"token", "base_url"} <= {kw.arg for kw in client_calls[0].keywords}
     assert "keycard" in prose and "pat" in prose and "rig" in prose
     assert "credential vault" in prose and "allocation" in prose
     assert "statically validated" in prose and "not live-validated" in prose
@@ -172,6 +180,7 @@ def test_multi_facility_notebook_is_read_only_and_probes_independently():
     assert calls(nb, ".projects")
     assert "for meta in facilities" in source
     assert "try:" in source and "except AuthenticationError" in source and "except ApiError" in source
+    assert "except Exception" in source and '"ERROR"' in source
     assert "AMSC_FACILITY" in source
     assert all(label in source for label in ("OK", "NO PROJECTS", "AUTH FAILED", "API FAILED"))
     forbidden = (".submit", ".mkdir", ".rm", ".upload", ".create_", ".delete")
@@ -185,6 +194,10 @@ def test_released_client_api_and_repository_pin():
     assert callable(Client.rig_facilities)
     assert callable(Client.facility_via_rig)
     assert callable(FacilityClient.projects)
+    assert callable(FacilityClient.info)
+    assert callable(FacilityClient.resources)
+    assert issubclass(AuthenticationError, Exception)
+    assert issubclass(ApiError, Exception)
     assert "rig_url" in inspect.signature(Client.rig_facilities).parameters
     assert "rig_url" in inspect.signature(Client.facility_via_rig).parameters
 
