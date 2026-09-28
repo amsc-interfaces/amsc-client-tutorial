@@ -153,7 +153,8 @@ def test_facility_notebooks_have_protected_read_and_guarded_submit(name, config)
     else:
         assert "constraint" in keywords
     for variable in (f"{prefix}_USERNAME", f"{prefix}_ACCOUNT", f"{prefix}_QUEUE"):
-        assert variable in source and (f'os.environ["{variable}"]' in source or f'os.getenv("{variable}")' in source)
+        assert variable in source
+        assert re.search(rf'os\.(?:environ\[|getenv\(){re.escape(chr(34) + variable + chr(34))}', source)
     if prefix == "NERSC":
         assert "NERSC_CONSTRAINT" in source
     wait_calls = calls(nb, ".wait")

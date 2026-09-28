@@ -43,12 +43,12 @@ class FakeClient:
 
     def facility(self, name: str):
         auth = self._registered[name]
-        account_api = SimpleNamespace(get_projects=lambda: [SimpleNamespace(id="p1")])
-        service = SimpleNamespace(_account_api=account_api)
-        inner = SimpleNamespace(_service_client=service)
-        return SimpleNamespace(_client=lambda: inner, _registry=SimpleNamespace(
-            get_authenticator=lambda registered_name: self._registered[registered_name]
-        ))
+        return SimpleNamespace(
+            projects=lambda: [SimpleNamespace(id="p1")],
+            _registry=SimpleNamespace(
+                get_authenticator=lambda registered_name: self._registered[registered_name]
+            ),
+        )
 
 
 def test_module_is_import_safe(monkeypatch):
@@ -80,7 +80,7 @@ def prepare_success(module, monkeypatch):
     monkeypatch.setattr(module, "Client", FakeClient)
     monkeypatch.setattr(module, "TokenAuthenticator", FakeAuthenticator)
     monkeypatch.setattr(module, "probe_openapi", lambda url: None)
-    monkeypatch.setattr(module, "_installed_version", lambda: "0.6.1")
+    monkeypatch.setattr(module, "_installed_version", lambda: "0.7.0")
 
 
 def test_success_uses_one_client_and_two_auth_domains(monkeypatch, capsys):
@@ -131,12 +131,10 @@ def test_protected_alcf_failure_is_fatal(monkeypatch):
 
     class BrokenAlcfClient(FakeClient):
         def facility(self, name: str):
-            account_api = SimpleNamespace(
-                get_projects=lambda: (_ for _ in ()).throw(RuntimeError("unauthorized"))
-            )
-            service = SimpleNamespace(_account_api=account_api)
-            inner = SimpleNamespace(_service_client=service)
-            return SimpleNamespace(_client=lambda: inner)
+            def fail_projects():
+                raise RuntimeError("unauthorized")
+
+            return SimpleNamespace(projects=fail_projects)
 
     monkeypatch.setattr(module, "Client", BrokenAlcfClient)
     assert module.main() == 1
@@ -152,7 +150,7 @@ def test_wrong_installed_version_is_fatal(monkeypatch):
 def test_script_contains_only_read_only_operations():
     source = SCRIPT.read_text()
     assert "account.me()" in source
-    assert "_account_api.get_projects()" in source
+    assert ".projects()" in source
     for forbidden in (
         ".submit(",
         "catalog.create",

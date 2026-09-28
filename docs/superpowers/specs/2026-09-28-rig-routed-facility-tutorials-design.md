@@ -1,7 +1,7 @@
 # RIG-routed facility helper and tutorial notebooks
 
-**Date:** 2026-09-28  
-**Status:** Approved design; implementation pending  
+**Date:** 2026-09-28
+**Status:** Approved design; implementation pending
 **Repositories:** `amsc-python-client`, `amsc-client-tutorial`
 
 ## Purpose
