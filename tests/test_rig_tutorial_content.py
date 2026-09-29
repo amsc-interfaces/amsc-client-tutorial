@@ -188,9 +188,9 @@ def test_multi_facility_notebook_is_read_only_and_probes_independently():
 
 
 def test_released_client_api_and_repository_pin():
-    assert importlib.metadata.version("amsc-client") == "0.7.0"
+    assert importlib.metadata.version("amsc-client") == "0.7.1"
     requirements = (REPO / "requirements.txt").read_text()
-    assert "amsc-client==0.7.0" in requirements
+    assert "amsc-client==0.7.1" in requirements
     assert callable(Client.rig_facilities)
     assert callable(Client.facility_via_rig)
     assert callable(FacilityClient.projects)
@@ -211,4 +211,4 @@ def test_readme_links_and_explains_both_facility_routes():
     assert "via rig" in lowered and "experimental" in lowered
     assert 'client.facility("alcf")' in readme
     assert 'client.facility_via_rig("alcf"' in readme
-    assert "amsc-client==0.7.0" in readme
+    assert "amsc-client==0.7.1" in readme
