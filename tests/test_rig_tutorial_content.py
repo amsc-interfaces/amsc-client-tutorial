@@ -172,6 +172,38 @@ def test_facility_notebooks_have_protected_read_and_guarded_submit(name, config)
     assert "RUN_ID" in source
 
 
+def test_nersc_rig_notebook_documents_token_setup_and_recovery():
+    prose = text(load("nersc_via_rig.ipynb"))
+    lowered = prose.lower()
+
+    assert "https://github.com/NERSC/iri-api-get-globus-token" in prose
+    assert "https://rig-ui.staging.american-science-cloud.org/credential-vault" in prose
+    assert "python get_globus_token.py" in prose
+    assert "--facilities nersc" in prose
+    assert "--force-login" in prose
+    assert "--validate-iri" in prose
+    assert "--print-token" in prose
+    assert (
+        "https://auth.globus.org/scopes/ed3e577d-f7f3-4639-b96e-ff5a8445d699/iri_api"
+        in prose
+    )
+    assert "IRI validation succeeded for NERSC IRI API" in prose
+    assert "NERSC IRI API access token" in prose
+    assert "amsc-development-team" in prose
+    assert "private/incognito browser window" in lowered
+    assert all(
+        phrase in lowered
+        for phrase in ("shell history", "chat", "screenshots", "notebook output")
+    )
+    assert "credentials are project-scoped" in lowered
+    assert "rotate" in lowered
+    assert "verify via rig" in lowered
+    assert "do not continue until verification succeeds" in lowered
+    assert "amsc_token" in lowered and "amsc pat" in lowered
+    assert "inactive token" in lowered and "invalid token" in lowered
+    assert "globus access tokens expire" in lowered
+
+
 def test_multi_facility_notebook_is_read_only_and_probes_independently():
     nb = load("multi_facility_via_rig.ipynb")
     source = code(nb)
