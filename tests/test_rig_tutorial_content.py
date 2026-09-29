@@ -172,6 +172,28 @@ def test_facility_notebooks_have_protected_read_and_guarded_submit(name, config)
     assert "RUN_ID" in source
 
 
+def test_alcf_rig_notebook_documents_connection_setup_and_recovery():
+    prose = text(load("alcf_via_rig.ipynb"))
+    lowered = prose.lower()
+
+    assert "https://rig-ui.staging.american-science-cloud.org/credential-vault" in prose
+    assert "active project" in lowered and "project encoded in" in lowered
+    assert "amsc_token" in lowered and "amsc pat" in lowered
+    assert "get auth url" in lowered
+    assert "argonne lcf" in lowered and "alcf.anl.gov" in lowered
+    assert "authorization code" in lowered and "submit code" in lowered
+    assert "alcf card to show **connected**" in lowered
+    assert "test with rig" in lowered
+    assert "do not continue until" in lowered
+    assert "401" in prose
+    assert "high-assurance timeout" in lowered
+    assert "fresh interactive connection" in lowered
+    assert all(
+        phrase in lowered
+        for phrase in ("notebook cells", "chat", "shell history", "screenshots")
+    )
+
+
 def test_nersc_rig_notebook_documents_token_setup_and_recovery():
     prose = text(load("nersc_via_rig.ipynb"))
     lowered = prose.lower()
