@@ -216,7 +216,7 @@ if SUBMIT_JOB:
 
 If you receive an `HTTP 401` error when submitting a job (distinct from a login failure), your account may not be on the facility's IRI API access list. Contact the relevant support team:
 
-- **ALCF:** [help.alcf.anl.gov](https://help.alcf.anl.gov)
+- **ALCF:** Email [support@lacf,anl.gov](mailto:support@alcf.anl.gov)
 - **NERSC:** [help.nersc.gov](https://help.nersc.gov)
 
 ### ALCF high-assurance token expiry
