@@ -1,7 +1,9 @@
 import ast
 import importlib.util
 import json
+import os
 from pathlib import Path
+import subprocess
 
 import pytest
 
@@ -23,6 +25,93 @@ def _load_helper():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def test_dotenv_files_are_ignored_but_example_is_trackable():
+    def check(path: str) -> int:
+        return subprocess.run(
+            ["git", "check-ignore", "-q", path], cwd=ROOT, check=False
+        ).returncode
+
+    assert check(".env") == 0
+    assert check(".env.local") == 0
+    assert check(".env.hackathon") == 0
+    assert check(".env.example") != 0
+
+
+def test_dotenv_loads_only_allowed_credentials_without_overriding_environment(tmp_path, monkeypatch):
+    helper = _load_helper()
+    for key in helper.ALLOWED_ENV_KEYS:
+        monkeypatch.delenv(key, raising=False)
+    dotenv = tmp_path / ".env"
+    dotenv.write_text(
+        "AMSC_TOKEN=central\n"
+        "OLCF_S3M_TOKEN_OPEN=open\n"
+        "OLCF_S3M_TOKEN_MODERATE=moderate\n"
+        "PATH=/malicious\n"
+        "PYTHONPATH=/also-malicious\n"
+    )
+    dotenv.chmod(0o600)
+    monkeypatch.setenv("AMSC_TOKEN", "already-set")
+    old_path = os.environ.get("PATH")
+    old_pythonpath = os.environ.get("PYTHONPATH")
+
+    helper.load_env_file(dotenv)
+
+    assert os.environ["AMSC_TOKEN"] == "already-set"
+    assert os.environ["OLCF_S3M_TOKEN_OPEN"] == "open"
+    assert os.environ["OLCF_S3M_TOKEN_MODERATE"] == "moderate"
+    assert os.environ.get("PATH") == old_path
+    assert os.environ.get("PYTHONPATH") == old_pythonpath
+
+
+def test_dotenv_rejects_symlink_and_group_or_world_readable_file(tmp_path):
+    helper = _load_helper()
+    real = tmp_path / "real.env"
+    real.write_text("OLCF_S3M_TOKEN_OPEN=open\n")
+    real.chmod(0o644)
+    with pytest.raises(helper.UnsafeEnvFileError):
+        helper.load_env_file(real)
+
+    real.chmod(0o600)
+    link = tmp_path / ".env"
+    link.symlink_to(real)
+    with pytest.raises(helper.UnsafeEnvFileError):
+        helper.load_env_file(link)
+
+
+def test_missing_dotenv_is_optional(tmp_path):
+    helper = _load_helper()
+    helper.load_env_file(tmp_path / "missing.env")
+
+
+def test_dotenv_example_and_documentation_contract():
+    readme = (ROOT / "README.md").read_text()
+    example = (ROOT / ".env.example").read_text()
+    assert "cp .env.example .env" in readme
+    assert "chmod 600 .env" in readme
+    assert "do not commit" in readme.lower()
+    for key in ("AMSC_TOKEN", "OLCF_S3M_TOKEN_OPEN", "OLCF_S3M_TOKEN_MODERATE"):
+        assert key in example
+    assert "ALCF_IRI_TOKEN" not in example
+    assert "NERSC" in example and "Globus" in example
+    for line in example.splitlines():
+        if line and not line.startswith("#"):
+            _, value = line.split("=", 1)
+            assert value == ""
+
+
+def test_no_real_dotenv_is_tracked():
+    tracked = subprocess.run(
+        ["git", "ls-files", "-z"], cwd=ROOT, check=True, capture_output=True
+    ).stdout.decode().split("\0")
+    forbidden = [
+        path
+        for path in tracked
+        if Path(path).name == ".env"
+        or (Path(path).name.startswith(".env.") and Path(path).name != ".env.example")
+    ]
+    assert forbidden == []
 
 
 def test_direct_olcf_notebook_is_clean_and_compiles():

@@ -29,7 +29,16 @@ This installs `amsc-client==0.7.1` and Jupyter from the four public AmSC GitLab 
 
 ### 4. Set up authentication
 
-Central-service tutorials (catalog) require an **AmSC Keycard** — an OAuth2 access token for the Genesis AmSC API:
+Central-service tutorials (catalog) require an **AmSC Keycard** — an OAuth2 access token for the Genesis AmSC API. For hackathon convenience, copy the tracked, empty template to the repository-root `.env`:
+
+```bash
+cp .env.example .env
+chmod 600 .env
+```
+
+Populate only the entries you need. The file can hold `AMSC_TOKEN` plus the independent OLCF Open and Moderate S3M tokens. It is parsed as data—not sourced as shell—and existing process environment values take precedence. **Do not commit** `.env`, paste it into chat, or include its values in notebook output. If a populated file is ever committed, revoke or rotate every token in it immediately, even if the commit is later removed.
+
+Alternatively, export the central token before starting Jupyter:
 
 ```bash
 export AMSC_TOKEN='<your-amsc-keycard>'
@@ -37,7 +46,7 @@ export AMSC_TOKEN='<your-amsc-keycard>'
 
 The Genesis API endpoint is `https://api.genesis.american-science-cloud.org/api/current`.
 
-Facility tutorials (ALCF, NERSC, filesystem) use independent facility-native Globus authenticators. `client.facility("alcf")` and `client.facility("nersc")` do not reuse `AMSC_TOKEN`. When a protected facility call needs a credential and no usable cached credential exists, the client prints an authorization URL. Open it, log in with the appropriate facility identity, then paste the returned authorization code into the prompt.
+Facility tutorials use independent facility-native credentials. ALCF and NERSC use interactive Globus authenticators and cache credentials in `~/.amsc/credentials.json`; their tokens do not belong in `.env`. When a protected ALCF or NERSC call needs a credential, the client prints an authorization URL; open it, authenticate with the appropriate facility identity, and return the authorization code to the prompt. OLCF S3M uses the independent static tokens named in `.env.example`. None of these facility paths reuse `AMSC_TOKEN`.
 
 **Credential safety:** Never paste a token into a notebook cell, save it in notebook output, commit it, or print it. Export credentials in the shell before starting Jupyter. If a token is exposed, revoke or rotate it and clear the notebook output. The AmSC Passport/ID token is not an API bearer; central API calls require the AmSC Keycard access token.
 

@@ -11,9 +11,11 @@ the gap until the client supports v2 natively:
 
 * ``register_olcf`` registers an OLCF enclave with amsc-client and routes its
   requests to ``/api/v2``.
-* ``load_token`` reads per-enclave tokens from environment variables (or a
-  git-ignored ``.env`` file); ``read_token_file`` and ``resolve_token`` add
-  token files and a hidden prompt as alternatives.
+* ``load_token`` reads per-enclave tokens from existing environment variables or
+  the optional repository-root ``.env``. That file is git-ignored,
+  permission-checked on POSIX, allowlist-parsed, and never overrides an existing
+  environment value. ``read_token_file`` and ``resolve_token`` add token files
+  and a hidden prompt as alternatives.
 * ``whoami`` calls ``/api/v2/account/whoami``, which the generated SDK lacks.
 * ``verify_api_version`` and ``recent_requests`` show which API version the
   client actually calls.
@@ -55,6 +57,14 @@ AUTH_SCHEMES = {"raw", "bearer"}
 _S3M_ROUTES: dict[str, tuple[str, str]] = {}
 
 DEFAULT_ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
+ALLOWED_ENV_KEYS = frozenset(
+    {
+        "AMSC_TOKEN",
+        "OLCF_S3M_TOKEN_OPEN",
+        "OLCF_S3M_TOKEN_MODERATE",
+        "OLCF_S3M_TOKEN",  # backward-compatible open-enclave alias
+    }
+)
 
 TOKEN_SOURCES = {"env", "file", "prompt"}
 
@@ -64,6 +74,10 @@ _RECENT_REQUESTS: deque[str] = deque(maxlen=50)
 
 class MissingTokenError(RuntimeError):
     """Raised when no S3M token is configured for an enclave."""
+
+
+class UnsafeEnvFileError(RuntimeError):
+    """Raised when a local credential file fails safety checks."""
 
 
 
@@ -78,20 +92,32 @@ def token_env_vars(enclave: str) -> list[str]:
 
 
 def load_env_file(path: str | Path = DEFAULT_ENV_FILE) -> None:
-    """Load ``KEY=VALUE`` lines into ``os.environ`` without overriding.
+    """Load allowed credential assignments without overriding the environment.
 
-    Blank lines, ``#`` comments, an optional ``export`` prefix and matching
-    surrounding quotes are handled; nothing else is interpreted.
+    Missing files are optional. Existing files must be regular, non-symlink
+    files and, on POSIX, inaccessible to group and other users. This parser does
+    not evaluate shell syntax, interpolation, or commands.
     """
-    env_path = Path(path)
-    if not env_path.is_file():
+    env_path = Path(path).expanduser()
+    if not env_path.exists():
         return
+    if env_path.is_symlink() or not env_path.is_file():
+        raise UnsafeEnvFileError(
+            f"Credential file must be a regular file, not a symlink: {env_path}"
+        )
+    if os.name == "posix" and env_path.stat().st_mode & 0o077:
+        raise UnsafeEnvFileError(
+            f"Credential file is accessible by group/others: {env_path}; "
+            f"run chmod 600 {env_path}"
+        )
     for line in env_path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, value = line.split("=", 1)
         key = key.removeprefix("export ").strip()
+        if key not in ALLOWED_ENV_KEYS:
+            continue
         value = value.strip()
         if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
             value = value[1:-1]
