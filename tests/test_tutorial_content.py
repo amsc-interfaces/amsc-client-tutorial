@@ -282,7 +282,7 @@ class TestNoEmbeddedCredentials:
 
 
 class TestCatalogExplorer:
-    """catalog_explorer.ipynb — read-only, AmSC Keycard, staging endpoint."""
+    """catalog_explorer.ipynb — read-only, AmSC Keycard, Genesis endpoint."""
 
     @pytest.fixture
     def nb(self):
@@ -292,16 +292,15 @@ class TestCatalogExplorer:
     def code(self, nb):
         return all_code(nb)
 
-    def test_uses_staging_base_url(self, code):
-        assert "api.staging.american-science-cloud.org" in code, (
-            "catalog_explorer must use the staging base URL"
+    def test_uses_genesis_base_url(self, code):
+        assert "api.genesis.american-science-cloud.org" in code, (
+            "catalog_explorer must use the Genesis base URL"
         )
 
     def test_no_production_base_url_as_default(self, code):
-        # Production URL must not be the hard-coded default
         prod_pat = r'base_url\s*=\s*["\']https://api\.american-science-cloud\.org/api/current["\']'
         assert not re.search(prod_pat, code), (
-            "catalog_explorer still hard-codes the production base URL — use staging"
+            "catalog_explorer must not hard-code the production base URL"
         )
 
     def test_no_use_id_token(self, code):
@@ -339,7 +338,7 @@ class TestCatalogExplorer:
 
 
 class TestCatalogTutorial:
-    """catalog_tutorial.ipynb — CRUD, write-gated, Keycard, staging."""
+    """catalog_tutorial.ipynb — CRUD, write-gated, Keycard, Genesis."""
 
     @pytest.fixture
     def nb(self):
@@ -349,8 +348,8 @@ class TestCatalogTutorial:
     def code(self, nb):
         return all_code(nb)
 
-    def test_uses_staging_base_url(self, code):
-        assert "api.staging.american-science-cloud.org" in code
+    def test_uses_genesis_base_url(self, code):
+        assert "api.genesis.american-science-cloud.org" in code
 
     def test_no_use_id_token(self, code):
         assert "use_id_token" not in code
@@ -688,9 +687,9 @@ class TestReadmeContent:
             "README still shows manual register_facility for NERSC — it's now built-in"
         )
 
-    def test_staging_url_present(self, readme):
-        assert "staging.american-science-cloud.org" in readme, (
-            "README must reference the staging endpoint"
+    def test_genesis_url_present(self, readme):
+        assert "api.genesis.american-science-cloud.org" in readme, (
+            "README must reference the Genesis endpoint"
         )
 
     def test_python_floor_matches_published_wheel(self, readme):
@@ -704,7 +703,7 @@ class TestReadmeContent:
 
     def test_live_validation_status_is_dated_and_scoped(self, readme):
         assert "2026-09-22" in readme
-        assert "AmSC staging" in readme and "Live-validated" in readme
+        assert "Genesis AmSC" in readme and "Live-validated" in readme
         assert "ALCF direct IRI v1" in readme and "protected account" in readme
         assert "Public facility discovery does not prove authentication" in readme
 
@@ -901,8 +900,8 @@ class TestPytorchGuide:
         assert "use_id_token=True" not in guide
 
     def test_no_hardcoded_username(self, guide):
-        if "parton" in guide or "youruser" in guide:
-            pass  # youruser is the recommended placeholder — OK
+        # 'youruser' is an acceptable placeholder; a personal executable default is not.
+        assert 'ALCF_USER = "parton"' not in guide
         # But 'parton' as an executable default is not OK
         for match in re.finditer(r"account\s*=\s*['\"]parton['\"]", guide):
             pytest.fail(

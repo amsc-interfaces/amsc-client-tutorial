@@ -91,14 +91,14 @@ def test_success_uses_one_client_and_two_auth_domains(monkeypatch, capsys):
     assert module.main() == 0
     assert len(FakeClient.instances) == 1
     client = FakeClient.instances[0]
-    assert client.base_url == "https://api.staging.american-science-cloud.org/api/current"
+    assert client.base_url == "https://api.genesis.american-science-cloud.org/api/current"
     assert client.central_token == "central-secret-value"
     assert client._registered["alcf"].get_token() == "facility-secret-value"
     assert client._registered["alcf"] is not client._authenticator
     captured = capsys.readouterr()
     assert "central-secret-value" not in captured.out + captured.err
     assert "facility-secret-value" not in captured.out + captured.err
-    assert "staging protected account" in captured.out
+    assert "Genesis protected account" in captured.out
     assert "ALCF protected account" in captured.out
 
 
@@ -169,7 +169,7 @@ def test_script_contains_only_read_only_operations():
 
 def test_exact_openapi_urls():
     module = load_smoke()
-    assert module.STAGING_OPENAPI_URL == (
-        "https://api.staging.american-science-cloud.org/api/current/openapi.json"
+    assert module.GENESIS_OPENAPI_URL == (
+        "https://api.genesis.american-science-cloud.org/api/current/openapi.json"
     )
     assert module.ALCF_OPENAPI_URL == "https://api.alcf.anl.gov/openapi.json"

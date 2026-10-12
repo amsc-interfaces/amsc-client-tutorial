@@ -29,13 +29,13 @@ This installs `amsc-client==0.7.1` and Jupyter from the four public AmSC GitLab 
 
 ### 4. Set up authentication
 
-Central-service tutorials (catalog) require an **AmSC Keycard** — an OAuth2 access token for the AmSC staging API:
+Central-service tutorials (catalog) require an **AmSC Keycard** — an OAuth2 access token for the Genesis AmSC API:
 
 ```bash
 export AMSC_TOKEN='<your-amsc-keycard>'
 ```
 
-The AmSC staging API endpoint is `https://api.staging.american-science-cloud.org/api/current`.
+The Genesis API endpoint is `https://api.genesis.american-science-cloud.org/api/current`.
 
 Facility tutorials (ALCF, NERSC, filesystem) use independent facility-native Globus authenticators. `client.facility("alcf")` and `client.facility("nersc")` do not reuse `AMSC_TOKEN`. When a protected facility call needs a credential and no usable cached credential exists, the client prints an authorization URL. Open it, log in with the appropriate facility identity, then paste the returned authorization code into the prompt.
 
@@ -51,39 +51,11 @@ jupyter notebook notebooks/
 
 | Notebook | Description | Auth Required |
 |----------|-------------|---------------|
-| [**Catalog Explorer**](notebooks/catalog_explorer.ipynb) | Browse the AmSC data catalog — search, filter, and inspect scientific works and artifacts on staging | `AMSC_TOKEN` (AmSC Keycard) |
+| [**Catalog Explorer**](notebooks/catalog_explorer.ipynb) | Browse the AmSC data catalog — search, filter, and inspect scientific works and artifacts on Genesis | `AMSC_TOKEN` (AmSC Keycard) |
 | [**Catalog Tutorial**](notebooks/catalog_tutorial.ipynb) | Full CRUD operations — create, update, search, and delete catalog entities | `AMSC_TOKEN` + write access |
 | [**ALCF Facility Tutorial**](notebooks/alcf_facility_tutorial.ipynb) | Connect to ALCF, explore Polaris and other resources, and optionally submit a job | ALCF Globus (facility-native) |
 | [**NERSC Facility Tutorial**](notebooks/nersc_facility_tutorial.ipynb) | Connect to NERSC, explore Perlmutter resources, and optionally submit a job | NERSC Globus (facility-native) |
 | [**Filesystem Tutorial**](notebooks/filesystem_tutorial.ipynb) | Filesystem operations on ALCF resources — ls, head, tail, stat, cp, mv, mkdir, rm, and more | ALCF Globus (facility-native) |
-
-### Via RIG — experimental
-
-These notebooks use the explicit `amsc-client==0.7.1` RIG route. They do not change the direct facility tutorials above.
-
-- [**ALCF via RIG**](notebooks_via_rig/alcf_via_rig.ipynb) — protected project read, resource inspection, and default-off Polaris submission.
-- [**NERSC via RIG**](notebooks_via_rig/nersc_via_rig.ipynb) — protected project read, resource inspection, and default-off Perlmutter submission.
-- [**Multi-facility via RIG**](notebooks_via_rig/multi_facility_via_rig.ipynb) — read-only runtime discovery and independent protected probes.
-
-```text
-Direct: client.facility("alcf")
-  -> facility-native credential -> direct facility IRI API
-
-Via RIG: client.facility_via_rig("alcf", rig_url=...)
-  -> AMSC_TOKEN (AmSC Keycard/PAT) -> RIG -> facility IRI API
-```
-
-RIG may still require an active facility allocation plus Credential Vault or token-exchange setup. An AmSC PAT alone does not grant facility access. Never paste or print credentials in notebook cells, and leave `SUBMIT_JOB=False` unless you intend to create a real scheduler job.
-
-**Validation status (2026-09-28):** all three RIG notebooks are statically validated against the published `amsc-client==0.7.1` wheel. This campaign did not perform protected-read live validation through staging RIG and did not submit jobs or mutate filesystems. Treat every facility's live result independently.
-
-### Recommended order
-
-1. **Catalog Explorer** — read-only, requires only an AmSC Keycard
-2. **ALCF Facility Tutorial** — requires an ALCF account, allocation, and IRI API access
-3. **NERSC Facility Tutorial** — requires a NERSC account, allocation, and IRI API access
-4. **Filesystem Tutorial** — requires an ALCF account and IRI API access
-5. **Catalog Tutorial** — requires write access to a staging catalog
 
 ## Authentication architecture
 
@@ -91,8 +63,8 @@ The client uses **two independent credential domains**:
 
 ```text
 AMSC_TOKEN (AmSC Keycard / access token)
-  → staging AmSC services: Catalog, Account, Workflow, MLflow
-  → base URL: https://api.staging.american-science-cloud.org/api/current
+  → Genesis AmSC services: Catalog, Account, Workflow, MLflow
+  → base URL: https://api.genesis.american-science-cloud.org/api/current
 
 Facility-native Globus authenticator (ALCF or NERSC)
   → direct IRI v1 facility API (alcf or nersc built-in)
@@ -103,7 +75,7 @@ Facility-native Globus authenticator (ALCF or NERSC)
 
 ### Authentication quick reference
 
-- **Catalog notebooks:** export `AMSC_TOKEN` before starting Jupyter. These calls target the AmSC staging API.
+- **Catalog notebooks:** export `AMSC_TOKEN` before starting Jupyter. These calls target the Genesis AmSC API.
 - **ALCF and filesystem notebooks:** no `AMSC_TOKEN` is needed for facility-only access. The built-in ALCF authenticator starts an ALCF Globus login when a protected IRI v1 call first needs a token.
 - **NERSC notebook:** no `AMSC_TOKEN` is needed for facility-only access. The built-in NERSC authenticator uses a separate NERSC Globus login.
 - **Stale facility login:** restart the kernel and reauthenticate. If necessary, remove `~/.amsc/credentials.json` to force a fresh login. Never copy credentials from that file into a notebook.
@@ -113,7 +85,7 @@ Facility-native Globus authenticator (ALCF or NERSC)
 
 Validation claims are scoped and dated; they do not imply that every example or write path has run at every facility.
 
-- **AmSC staging — Live-validated 2026-09-22:** the AmSC Keycard authenticated a protected central account read. Read-only catalog examples are also covered by the static suite; catalog writes still require the user's authorized staging catalog.
+- **Genesis AmSC — Live-validated 2026-09-22:** the AmSC Keycard authenticated a protected Genesis central account read. Read-only catalog examples are also covered by the static suite; catalog writes still require the user's authorized Genesis catalog.
 - **ALCF direct IRI v1 — Live-validated 2026-09-22:** an independent facility-native Globus token authenticated a protected account-project read through the same `Client`. Public facility discovery does not prove authentication. Job submission and filesystem mutations remain explicit opt-in operations.
 - **NERSC — Not yet live-validated by the tutorial maintainers:** NERSC is built into `amsc-client 0.7.1`, and the notebook is statically checked against the published API, but its login, protected reads, filesystem access, and submission flow still require live validation.
 - **OLCF — Not currently covered:** No built-in `amsc-client 0.7.1` facility configuration exists, and this repository has no OLCF tutorial. Do not adapt the NERSC or ALCF examples by changing only the facility name.
@@ -217,7 +189,7 @@ if SUBMIT_JOB:
 
 ### For catalog tutorials
 - An AmSC Keycard (access token) in `AMSC_TOKEN`
-- For write operations: staging catalog write access
+- For write operations: Genesis catalog write access
 
 ### For ALCF tutorials
 - An [ALCF account](https://accounts.alcf.anl.gov/)

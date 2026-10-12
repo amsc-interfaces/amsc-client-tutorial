@@ -118,21 +118,21 @@ If you see `error -61` from the macOS keychain when pushing images:
 
 | Operation | Status | Notes |
 |-----------|--------|-------|
-| `ls` | ✅ Public 0.6 surface | On Home/Eagle only |
-| `head` | ✅ Public 0.6 surface | Read first N lines/bytes |
-| `tail` | ✅ Public 0.6 surface | Read last N lines/bytes |
-| `stat` | ✅ Public 0.6 surface | File metadata |
-| `checksum` | ✅ Public 0.6 surface | |
-| `download` | ✅ Public 0.6 surface | Remote → local |
-| `upload` | ✅ Public 0.6 surface | Local → remote (preferred transfer method) |
-| `mkdir` | ✅ Public 0.6 surface | |
-| `cp` | ✅ Public 0.6 surface | |
-| `mv` | ✅ Public 0.6 surface | |
-| `rm` | ✅ Public 0.6 surface | |
-| `symlink` | ✅ Public 0.6 surface | |
-| `chmod` | ✅ Public 0.6 surface | |
-| `compress` | ✅ Public 0.6 surface | |
-| `extract` | ✅ Public 0.6 surface | |
+| `ls` | ✅ Public 0.7.1 surface | On Home/Eagle only |
+| `head` | ✅ Public 0.7.1 surface | Read first N lines/bytes |
+| `tail` | ✅ Public 0.7.1 surface | Read last N lines/bytes |
+| `stat` | ✅ Public 0.7.1 surface | File metadata |
+| `checksum` | ✅ Public 0.7.1 surface | |
+| `download` | ✅ Public 0.7.1 surface | Remote → local |
+| `upload` | ✅ Public 0.7.1 surface | Local → remote (preferred transfer method) |
+| `mkdir` | ✅ Public 0.7.1 surface | |
+| `cp` | ✅ Public 0.7.1 surface | |
+| `mv` | ✅ Public 0.7.1 surface | |
+| `rm` | ✅ Public 0.7.1 surface | |
+| `symlink` | ✅ Public 0.7.1 surface | |
+| `chmod` | ✅ Public 0.7.1 surface | |
+| `compress` | ✅ Public 0.7.1 surface | |
+| `extract` | ✅ Public 0.7.1 surface | |
 | `compress` | ❌ 501 Not Implemented | |
 | `extract` | ❌ 501 Not Implemented | |
 
@@ -684,7 +684,7 @@ def read_output(home, work_dir, job_name, max_chars=10000):
     for label, fname in [("stdout", f"{job_name}.stdout"),
                           ("stderr", f"{job_name}.stderr")]:
         try:
-            # fs.head() is the public 0.6 surface for reading file content.
+            # fs.head() is the public 0.7.1 surface for reading file content.
             # Filesystem Tasks are synchronously resolved — use .result directly.
             task = home.fs.head(f"{work_dir}/{fname}")
             r = task.result
@@ -721,7 +721,7 @@ A clean 2-node run with MPICH 4.1.2 + CMA disabled produces ~8KB of stderr (most
 
 ### 10.3 Reading the tail of large files
 
-`fs.tail()` is supported in the 0.6 public surface. To get just the end of a large output file:
+`fs.tail()` is supported in the 0.7.1 public surface. To get just the end of a large output file:
 
 ```python
 task = home.fs.tail(f"{work_dir}/job.stderr")
@@ -1030,7 +1030,7 @@ job.state      # e.g., "completed", "failed", "active", "queued"
 job.exit_code  # integer exit code
 job.id         # PBS job ID
 
-# Read a file (0.6 public surface: fs.head() or fs.tail(); Task is synchronously resolved)
+# Read a file (0.7.1 public surface: fs.head() or fs.tail(); Task is synchronously resolved)
 task = home.fs.head(f"/home/{ALCF_USER}/some/file.txt")
 content = task.result.get('output', {}).get('content', '')
 ```

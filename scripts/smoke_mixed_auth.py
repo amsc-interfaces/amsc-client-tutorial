@@ -1,6 +1,6 @@
 """Opt-in, read-only mixed-auth smoke test for ``amsc-client==0.7.1``.
 
-The central AmSC staging API uses ``AMSC_TOKEN`` (an AmSC Keycard access
+The central Genesis AmSC API uses ``AMSC_TOKEN`` (an AmSC Keycard access
 token). The direct ALCF IRI v1 API uses the independent ``ALCF_IRI_TOKEN``.
 The script performs only public OpenAPI reads and protected account reads.
 It never prints, compares via serialization, or otherwise exposes token values.
@@ -11,12 +11,13 @@ import os
 import sys
 import urllib.request
 from importlib.metadata import PackageNotFoundError, version
+import argparse
 
 from amsc_client import Client
 from amsc_client.auth import TokenAuthenticator
 
-STAGING_BASE_URL = "https://api.staging.american-science-cloud.org/api/current"
-STAGING_OPENAPI_URL = f"{STAGING_BASE_URL}/openapi.json"
+GENESIS_BASE_URL = "https://api.genesis.american-science-cloud.org/api/current"
+GENESIS_OPENAPI_URL = f"{GENESIS_BASE_URL}/openapi.json"
 ALCF_OPENAPI_URL = "https://api.alcf.anl.gov/openapi.json"
 EXPECTED_VERSION = "0.7.1"
 _REQUIRED_VARS = ("AMSC_TOKEN", "ALCF_IRI_TOKEN")
@@ -41,7 +42,14 @@ def _installed_version() -> str:
         return "not-installed"
 
 
-def main() -> int:
+def main(argv=None) -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--base-url",
+        default="https://api.genesis.american-science-cloud.org/api/current",
+        help="Genesis AmSC central API base URL (default: Genesis endpoint)",
+    )
+    args = parser.parse_args([] if argv is None else argv)
     missing = [name for name in _REQUIRED_VARS if not os.environ.get(name)]
     if missing:
         print(
@@ -61,19 +69,20 @@ def main() -> int:
         return 1
 
     try:
-        probe_openapi(STAGING_OPENAPI_URL)
-        print("[OK] AmSC staging OpenAPI is reachable")
+        openapi_url = f"{args.base_url}/openapi.json"
+        probe_openapi(openapi_url)
+        print("[OK] Genesis AmSC OpenAPI is reachable")
         probe_openapi(ALCF_OPENAPI_URL)
         print("[OK] ALCF IRI OpenAPI is reachable")
 
-        client = Client(token=amsc_token, base_url=STAGING_BASE_URL)
+        client = Client(token=amsc_token, base_url=args.base_url)
         alcf_authenticator = TokenAuthenticator(token=alcf_token)
         if alcf_authenticator is client._authenticator:
             raise RuntimeError("central and facility authenticators are not independent")
         client.register_facility("alcf", authenticator=alcf_authenticator)
 
         client.account.me()
-        print("[OK] staging protected account read authenticated")
+        print("[OK] Genesis protected account read authenticated")
 
         alcf = client.facility("alcf")
         projects = alcf.projects()
@@ -84,9 +93,9 @@ def main() -> int:
         print(f"[FAIL] Mixed-auth verification failed ({type(exc).__name__}).", file=sys.stderr)
         return 1
 
-    print("[PASS] Independent staging and ALCF authentication verified read-only")
+    print("[PASS] Independent Genesis AmSC and ALCF authentication verified read-only")
     return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(main(sys.argv[1:]))
